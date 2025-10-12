@@ -1,0 +1,21 @@
+{
+  "HomePage": {
+    "title": "Costa Rica Now"
+  },
+  "Navigation": {
+    "news": "News",
+    "weather": "Weather",
+    "seismic": "Seismic",
+    "home": "Home"
+  },
+  "Titles": {
+    "home": "Costa Rica Now",
+    "news": "News - Costa Rica Now",
+    "weather": "Weather - Costa Rica Now",
+    "seismic": "Seismic Activity - Costa Rica Now"
+  },
+  "Footer": {
+    "title": "Costa Rica Now • News, Weather, Seismic and Volcanic Activity, Itineraries",
+    "description": "Real-time local personalized information"
+  }
+}

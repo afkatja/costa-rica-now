@@ -1,0 +1,17 @@
+{
+  "HomePage": {
+    "title": "Hola mundo!"
+  },
+  "Navigation": {
+    "news": "Noticias",
+    "weather": "Clima",
+    "seismic": "Sísmica",
+    "home": "Inicio"
+  },
+  "Titles": {
+    "home": "Costa Rica Now",
+    "news": "Noticias - Costa Rica Now",
+    "weather": "Clima - Costa Rica Now",
+    "seismic": "Actividad Sísmica - Costa Rica Now"
+  }
+}
