@@ -42,26 +42,26 @@ interface WeatherDisplayProps {
 }
 
 const getWeatherIcon = (condition: string, iconCode?: string) => {
-  const iconProps = { size: 20, className: "text-white" }
+  const iconProps = { size: 20, className: "text-gray-50" }
 
   switch (condition.toLowerCase()) {
     case "clear":
-      return <Sun {...iconProps} className="text-yellow-400" />
+      return <Sun {...iconProps} />
     case "clouds":
-      return <Cloud {...iconProps} className="text-gray-400" />
+      return <Cloud {...iconProps} />
     case "rain":
     case "drizzle":
-      return <CloudRain {...iconProps} className="text-blue-400" />
+      return <CloudRain {...iconProps} />
     case "thunderstorm":
-      return <Zap {...iconProps} className="text-purple-400" />
+      return <Zap {...iconProps} />
     case "snow":
-      return <Snowflake {...iconProps} className="text-blue-200" />
+      return <Snowflake {...iconProps} />
     case "mist":
     case "fog":
     case "haze":
-      return <Cloud {...iconProps} className="text-gray-300" />
+      return <Cloud {...iconProps} />
     default:
-      return <Sun {...iconProps} className="text-yellow-400" />
+      return <Sun {...iconProps} />
   }
 }
 
@@ -110,13 +110,19 @@ export function WeatherDisplay({
             <div
               key={w.location}
               className={cn(
-                "flex items-center gap-2 px-3 py-2 rounded-lg text-white text-sm",
+                "flex items-center gap-2 px-3 py-2 rounded-lg text-gray-50 text-sm",
                 `bg-gradient-to-r ${getBackgroundGradient(w.current.main)}`
               )}
             >
               {getWeatherIcon(w.current.main, w.current.icon)}
               <span className="font-medium">{w.name}</span>
-              <span className="font-bold">{w.current.temperature}°C</span>
+              <span
+                className={`${getTemperatureColor(
+                  w.current.temperature
+                )} font-bold`}
+              >
+                {w.current.temperature}°C
+              </span>
             </div>
           )
         })}
@@ -137,7 +143,7 @@ export function WeatherDisplay({
           <div
             key={w.location}
             className={cn(
-              "relative overflow-hidden rounded-xl p-4 text-white",
+              "relative overflow-hidden rounded-xl p-4 text-gray-50",
               `bg-gradient-to-br ${getBackgroundGradient(current.main)}`
             )}
           >
@@ -183,8 +189,8 @@ export function WeatherDisplay({
             </div>
 
             {/* Decorative Elements */}
-            <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-white/10 -translate-y-10 translate-x-10"></div>
-            <div className="absolute bottom-0 left-0 w-16 h-16 rounded-full bg-white/5 translate-y-8 -translate-x-8"></div>
+            <div className="absolute top-0 right-0 w-20 h-20 rounded-full bg-gray-50/10 -translate-y-10 translate-x-10"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-16 rounded-full bg-gray-50/5 translate-y-8 -translate-x-8"></div>
           </div>
         )
       })}
@@ -212,7 +218,7 @@ export function WeatherAlert({ weather }: { weather: WeatherData[] }) {
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 mt-0.5">
           <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center">
-            <span className="text-white text-xs font-bold">!</span>
+            <span className="text-gray-50 text-xs font-bold">!</span>
           </div>
         </div>
         <div>

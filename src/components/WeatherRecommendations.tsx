@@ -80,7 +80,7 @@ export function WeatherRecommendations({
 
       {/* Quick Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-        <div className="bg-white rounded-lg p-3 border border-emerald-100">
+        <div className="bg-gray-50 rounded-lg p-3 border border-emerald-100">
           <div className="flex items-center gap-2 mb-2">
             <Activity className="h-4 w-4 text-emerald-600" />
             <span className="font-medium text-emerald-800 text-sm">
@@ -99,7 +99,7 @@ export function WeatherRecommendations({
           </ul>
         </div>
 
-        <div className="bg-white rounded-lg p-3 border border-emerald-100">
+        <div className="bg-gray-50 rounded-lg p-3 border border-emerald-100">
           <div className="flex items-center gap-2 mb-2">
             <Shirt className="h-4 w-4 text-emerald-600" />
             <span className="font-medium text-emerald-800 text-sm">
@@ -118,7 +118,7 @@ export function WeatherRecommendations({
           </ul>
         </div>
 
-        <div className="bg-white rounded-lg p-3 border border-emerald-100">
+        <div className="bg-gray-50 rounded-lg p-3 border border-emerald-100">
           <div className="flex items-center gap-2 mb-2">
             <Package className="h-4 w-4 text-emerald-600" />
             <span className="font-medium text-emerald-800 text-sm">
@@ -139,7 +139,7 @@ export function WeatherRecommendations({
       </div>
 
       {/* Weather Tips */}
-      <div className="bg-white rounded-lg p-3 border border-emerald-100">
+      <div className="bg-gray-50 rounded-lg p-3 border border-emerald-100">
         <h5 className="font-medium text-emerald-800 mb-2">Weather Tips</h5>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {mainRecommendation.tips.weather
@@ -160,7 +160,7 @@ export function WeatherRecommendations({
       {expanded && (
         <div className="mt-4 space-y-4 border-t border-emerald-100 pt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white rounded-lg p-3 border border-emerald-100">
+            <div className="bg-gray-50 rounded-lg p-3 border border-emerald-100">
               <h5 className="font-medium text-emerald-800 mb-3">
                 All Recommended Activities
               </h5>
@@ -176,7 +176,7 @@ export function WeatherRecommendations({
               </ul>
             </div>
 
-            <div className="bg-white rounded-lg p-3 border border-emerald-100">
+            <div className="bg-gray-50 rounded-lg p-3 border border-emerald-100">
               <h5 className="font-medium text-emerald-800 mb-3">
                 Complete Packing List
               </h5>
@@ -215,7 +215,7 @@ export function WeatherRecommendations({
             </div>
           </div>
 
-          <div className="bg-white rounded-lg p-3 border border-emerald-100">
+          <div className="bg-gray-50 rounded-lg p-3 border border-emerald-100">
             <h5 className="font-medium text-emerald-800 mb-3">
               All Tips & Insights
             </h5>

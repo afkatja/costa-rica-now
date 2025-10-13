@@ -5,6 +5,7 @@ import { MapTooltip } from "./MapTooltip"
 import { mockSeismicData } from "../utils/mockSeismicData"
 import { Activity, Mountain, Clock, AlertTriangle } from "lucide-react"
 import { Badge } from "./ui/badge"
+import { useGeolocation } from "../hooks/use-geolocation"
 
 type PinType = "earthquake" | "volcano"
 
@@ -20,16 +21,60 @@ export function SeismicMap() {
   const [hoveredPin, setHoveredPin] = useState<string | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
-  // Combine earthquakes and volcanoes into pins
+  // Get user's location context
+  const { position, isInCostaRica, isWithinRadius } = useGeolocation()
+
+  // Helper function to calculate distance between two coordinates
+  const calculateDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ): number => {
+    const R = 6371 // Radius of the Earth in kilometers
+    const dLat = ((lat2 - lat1) * Math.PI) / 180
+    const dLon = ((lon2 - lon1) * Math.PI) / 180
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+  }
+
+  // Filter seismic data by location if user is in Costa Rica
+  const filterSeismicData = (data: any[], radiusKm: number = 100) => {
+    if (!position || !isInCostaRica) {
+      return data // Return all data if no location or not in Costa Rica
+    }
+
+    return data.filter(item => {
+      const distance = calculateDistance(
+        position.latitude,
+        position.longitude,
+        item.coordinates.lat,
+        item.coordinates.lon
+      )
+      return distance <= radiusKm
+    })
+  }
+
+  // Get filtered seismic data
+  const filteredEarthquakes = filterSeismicData(mockSeismicData.earthquakes)
+  const filteredVolcanoes = filterSeismicData(mockSeismicData.volcanoes)
+
+  // Combine filtered earthquakes and volcanoes into pins
   const seismicPins: SeismicPin[] = [
-    ...mockSeismicData.earthquakes.map(eq => ({
+    ...filteredEarthquakes.map(eq => ({
       id: eq.id,
       type: "earthquake" as const,
       lat: eq.coordinates.lat,
       lng: eq.coordinates.lon,
       data: eq,
     })),
-    ...mockSeismicData.volcanoes.map(vol => ({
+    ...filteredVolcanoes.map(vol => ({
       id: vol.id,
       type: "volcano" as const,
       lat: vol.coordinates.lat,
@@ -92,6 +137,18 @@ export function SeismicMap() {
 
   return (
     <div className="relative">
+      {/* Location Status Indicator */}
+      {position && isInCostaRica && (
+        <div className="absolute top-4 left-4 z-10 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 shadow-sm">
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+            <span className="text-emerald-700 font-medium">
+              Showing seismic activity within 100km of your location
+            </span>
+          </div>
+        </div>
+      )}
+
       <CostaRicaMap>
         {seismicPins.map(pin => {
           const { x, y } = coordsToSVG(pin.lat, pin.lng)
@@ -121,7 +178,7 @@ export function SeismicMap() {
                   y={y - 4}
                   width="8"
                   height="8"
-                  className="fill-white pointer-events-none"
+                  className="fill-gray-50 pointer-events-none"
                 />
               ) : (
                 <Mountain
@@ -129,7 +186,7 @@ export function SeismicMap() {
                   y={y - 4}
                   width="8"
                   height="8"
-                  className="fill-white pointer-events-none"
+                  className="fill-gray-50 pointer-events-none"
                 />
               )}
             </g>

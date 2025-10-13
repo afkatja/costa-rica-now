@@ -40,7 +40,7 @@ interface EventsDisplayProps {
 }
 
 const getCategoryIcon = (category: string) => {
-  const iconProps = { size: 16, className: "text-white" }
+  const iconProps = { size: 16, className: "text-gray-50" }
 
   switch (category.toLowerCase()) {
     case "cultural":
@@ -134,7 +134,7 @@ export function EventsDisplay({
           <div
             key={event.id}
             className={cn(
-              "flex items-center gap-2 px-3 py-2 rounded-lg text-white text-sm",
+              "flex items-center gap-2 px-3 py-2 rounded-lg text-gray-50 text-sm",
               `bg-gradient-to-r ${getCategoryGradient(event.category)}`
             )}
           >
@@ -168,12 +168,12 @@ export function EventsDisplay({
           return (
             <div
               key={event.id}
-              className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300"
+              className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300"
             >
               {/* Event Header */}
               <div
                 className={cn(
-                  "p-4 text-white relative",
+                  "p-4 text-gray-50 relative",
                   `bg-gradient-to-r ${getCategoryGradient(event.category)}`
                 )}
               >
@@ -183,11 +183,11 @@ export function EventsDisplay({
                       <span className="text-xl">
                         {getCategoryIcon(event.category)}
                       </span>
-                      <span className="text-xs font-medium bg-white/20 px-2 py-1 rounded-full capitalize">
+                      <span className="text-xs font-medium bg-gray-50/20 px-2 py-1 rounded-full capitalize">
                         {event.category}
                       </span>
                       {event.weather_dependent && (
-                        <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
+                        <span className="text-xs bg-gray-50/20 px-2 py-1 rounded-full">
                           ☁️ Weather dependent
                         </span>
                       )}
@@ -210,8 +210,8 @@ export function EventsDisplay({
                 </div>
 
                 {/* Decorative Elements */}
-                <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-white/10 -translate-y-12 translate-x-12"></div>
-                <div className="absolute bottom-0 left-0 w-16 h-16 rounded-full bg-white/5 translate-y-8 -translate-x-8"></div>
+                <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-gray-50/10 -translate-y-12 translate-x-12"></div>
+                <div className="absolute bottom-0 left-0 w-16 h-16 rounded-full bg-gray-50/5 translate-y-8 -translate-x-8"></div>
               </div>
 
               {/* Event Details */}
@@ -318,7 +318,7 @@ export function EventsAlert({ events }: { events: Event[] }) {
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 mt-0.5">
           <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-            <Ticket className="h-3 w-3 text-white" />
+            <Ticket className="h-3 w-3 text-gray-50" />
           </div>
         </div>
         <div>

@@ -110,7 +110,7 @@ export function WeatherMap() {
                 y={y - 4}
                 width="8"
                 height="8"
-                className="fill-white pointer-events-none"
+                className="fill-gray-50 pointer-events-none"
               />
             </g>
           )
