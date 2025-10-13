@@ -132,7 +132,7 @@ export default function AuthDialog({
         <DialogHeader className="space-y-4">
           <div className="flex justify-center items-center space-x-2">
             <div className="p-3 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
-              <Palmtree className="h-8 w-8 text-white" />
+              <Palmtree className="h-8 w-8 text-gray-50" />
             </div>
             {mode === "signup" && (
               <MapPin className="h-6 w-6 text-emerald-600" />
@@ -250,7 +250,7 @@ export default function AuthDialog({
 
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-medium py-2 px-4 rounded-md transition-all duration-200 transform hover:scale-[1.02]"
+              className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-gray-50 font-medium py-2 px-4 rounded-md transition-all duration-200 transform hover:scale-[1.02]"
               disabled={loading}
             >
               {loading ? (

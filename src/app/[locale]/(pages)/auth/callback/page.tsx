@@ -55,7 +55,7 @@ export default function AuthCallbackPage() {
       <div className="text-center space-y-6">
         <div className="flex justify-center items-center space-x-2">
           <div className="p-3 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
-            <Palmtree className="h-8 w-8 text-white" />
+            <Palmtree className="h-8 w-8 text-gray-50" />
           </div>
           <MapPin className="h-6 w-6 text-emerald-600" />
         </div>
