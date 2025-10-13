@@ -5,7 +5,15 @@ import { supabase } from "@/utils/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-import { Send, Bot, User, Cloud, Ticket } from "lucide-react"
+import {
+  Send,
+  Bot,
+  User,
+  Cloud,
+  Ticket,
+  MapPin,
+  Navigation,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "../hooks/use-toast"
 import { WeatherAlert, WeatherDisplay } from "./WeatherDisplay"
@@ -14,6 +22,7 @@ import LoadingSpinner from "./Loader"
 import { useAuth } from "../providers/auth-provider"
 import { createNavigation } from "next-intl/navigation"
 import AuthDialog from "./AuthDialog"
+import { useGeolocation } from "../hooks/use-geolocation"
 
 interface Message {
   id: string
@@ -70,11 +79,23 @@ export function ChatInterface() {
   const [showWeatherSummary, setShowWeatherSummary] = useState(true)
   const [showEventsSummary, setShowEventsSummary] = useState(true)
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
+  const [locationRequested, setLocationRequested] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user } = useAuth()
   const { toast } = useToast()
   const { useRouter } = createNavigation()
   const router = useRouter()
+
+  // Geolocation hook
+  const {
+    position,
+    error: locationError,
+    loading: locationLoading,
+    permission,
+    isInCostaRica,
+    requestLocation,
+    getLocationContext,
+  } = useGeolocation()
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -83,6 +104,32 @@ export function ChatInterface() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Function to detect if query is location-based
+  const isLocationBasedQuery = (query: string): boolean => {
+    const locationKeywords = [
+      "current weather",
+      "weather now",
+      "today's weather",
+      "activities near me",
+      "things to do nearby",
+      "events nearby",
+      "what to do today",
+      "current events",
+      "local activities",
+      "weather here",
+      "activities here",
+      "events here",
+    ]
+
+    const lowerQuery = query.toLowerCase()
+    return (
+      locationKeywords.some(keyword => lowerQuery.includes(keyword)) ||
+      (lowerQuery.includes("weather") && !lowerQuery.includes("in ")) ||
+      (lowerQuery.includes("activities") && !lowerQuery.includes("in ")) ||
+      (lowerQuery.includes("events") && !lowerQuery.includes("in "))
+    )
+  }
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -96,6 +143,24 @@ export function ChatInterface() {
     setInput("")
     setLoading(true)
 
+    // Check if this is a location-based query
+    const isLocationQuery = isLocationBasedQuery(userMessage)
+
+    // If it's a location-based query and we don't have location yet, request it
+    if (
+      isLocationQuery &&
+      !position &&
+      !locationRequested &&
+      permission !== "denied"
+    ) {
+      setLocationRequested(true)
+      try {
+        await requestLocation()
+      } catch (error) {
+        console.warn("Failed to get location:", error)
+      }
+    }
+
     // Add user message to UI immediately
     const tempUserMessage: Message = {
       id: `temp-${Date.now()}`,
@@ -106,6 +171,9 @@ export function ChatInterface() {
     setMessages(prev => [...prev, tempUserMessage])
 
     try {
+      // Get location context if available and relevant
+      const locationContext = isLocationQuery ? getLocationContext() : null
+
       // Call AI chat function - using ai-chat-enhanced for weather integration
       const { data, error } = await supabase.functions.invoke(
         "ai-chat-enhanced",
@@ -114,6 +182,7 @@ export function ChatInterface() {
             message: userMessage,
             conversationId,
             userPreferences: {}, // TODO: Get from user profile
+            locationContext, // Include location data for filtering
           },
         }
       )
@@ -179,13 +248,13 @@ export function ChatInterface() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-white/80 backdrop-blur-sm">
+    <div className="flex flex-col h-full bg-gray-50/80 backdrop-blur-sm">
       {/* Chat Header */}
-      <div className="border-b border-gray-200 p-4 bg-white/90">
+      <div className="border-b border-gray-200 p-4 bg-gray-50/90">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg">
-              <Bot className="h-5 w-5 text-white" />
+              <Bot className="h-5 w-5 text-gray-50" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
@@ -195,6 +264,12 @@ export function ChatInterface() {
                 <Cloud className="h-3 w-3" />
                 <Ticket className="h-3 w-3" />
                 AI-powered with weather & events
+                {position && isInCostaRica && (
+                  <span className="flex items-center gap-1 text-emerald-600">
+                    <MapPin className="h-3 w-3" />
+                    Location-enabled
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -263,50 +338,108 @@ export function ChatInterface() {
                 me about destinations, activities, weather, transportation, or
                 anything else about Costa Rica!
               </p>
+
+              {/* Location Status */}
+              {!position && permission !== "denied" && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Navigation className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-800">
+                      Enable Location for Personalized Recommendations
+                    </span>
+                  </div>
+                  <p className="text-xs text-blue-700 mb-3">
+                    Allow location access to get weather and activities near you
+                    when you're in Costa Rica.
+                  </p>
+                  <Button
+                    onClick={requestLocation}
+                    disabled={locationLoading}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {locationLoading ? (
+                      <LoadingSpinner size="sm" />
+                    ) : (
+                      <>
+                        <MapPin className="h-3 w-3 mr-1" />
+                        Share Location
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {position && isInCostaRica && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mt-4">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-emerald-600" />
+                    <span className="text-sm font-medium text-emerald-800">
+                      Location Enabled
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-700">
+                    Getting personalized recommendations based on your location
+                    in Costa Rica.
+                  </p>
+                </div>
+              )}
+
+              {locationError && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-4">
+                  <div className="flex items-center gap-2">
+                    <Navigation className="h-4 w-4 text-amber-600" />
+                    <span className="text-sm font-medium text-amber-800">
+                      Location Not Available
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-700">{locationError}</p>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6 max-w-2xl">
-              <button
+              <Button
                 onClick={() =>
                   setInput(
                     "What are the best destinations to visit in Costa Rica?"
                   )
                 }
-                className="p-3 text-left bg-white border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
+                className="p-3 text-left bg-gray-50 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
               >
                 <span className="text-sm font-medium text-emerald-700">
                   Best destinations to visit
                 </span>
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() =>
                   setInput("Create a 7-day itinerary for adventure activities")
                 }
-                className="p-3 text-left bg-white border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
+                className="p-3 text-left bg-gray-50 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
               >
                 <span className="text-sm font-medium text-emerald-700">
                   Create an adventure itinerary
                 </span>
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() =>
                   setInput("What are the best activities for today's weather?")
                 }
-                className="p-3 text-left bg-white border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
+                className="p-3 text-left bg-gray-50 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
               >
                 <span className="text-sm font-medium text-emerald-700">
                   Weather-based activity suggestions
                 </span>
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() =>
                   setInput("What events are happening this week in Costa Rica?")
                 }
-                className="p-3 text-left bg-white border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
+                className="p-3 text-left bg-gray-50 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
               >
                 <span className="text-sm font-medium text-emerald-700">
                   Current events and activities
                 </span>
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
@@ -314,8 +447,10 @@ export function ChatInterface() {
             <div
               key={message.id}
               className={cn(
-                "flex gap-3 max-w-4xl",
-                message.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
+                "flex gap-3",
+                message.role === "user"
+                  ? "ml-auto flex-row-reverse max-w-4xl"
+                  : "mr-auto prose lg:prose-xl"
               )}
             >
               <div
@@ -327,17 +462,17 @@ export function ChatInterface() {
                 )}
               >
                 {message.role === "user" ? (
-                  <User className="h-4 w-4 text-white" />
+                  <User className="h-4 w-4 text-gray-50" />
                 ) : (
-                  <Bot className="h-4 w-4 text-white" />
+                  <Bot className="h-4 w-4 text-gray-50" />
                 )}
               </div>
               <div
                 className={cn(
-                  "flex-1 px-4 py-3 rounded-lg max-w-3xl",
+                  "flex-1 px-4 py-3 rounded-lg",
                   message.role === "user"
-                    ? "bg-blue-500 text-white"
-                    : "bg-white border border-gray-200 text-gray-900"
+                    ? "bg-blue-500 text-gray-50 max-w-3xl"
+                    : "bg-gray-50 border border-gray-200 text-gray-900 max-w-none"
                 )}
               >
                 <div className="prose prose-sm max-w-none">
@@ -346,7 +481,9 @@ export function ChatInterface() {
                       key={i}
                       className={cn(
                         "mb-2 last:mb-0",
-                        message.role === "user" ? "text-white" : "text-gray-900"
+                        message.role === "user"
+                          ? "text-gray-50"
+                          : "text-gray-900"
                       )}
                     >
                       {line}
@@ -419,9 +556,9 @@ export function ChatInterface() {
         {loading && (
           <div className="flex gap-3 max-w-4xl mr-auto">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-              <Bot className="h-4 w-4 text-white" />
+              <Bot className="h-4 w-4 text-gray-50" />
             </div>
-            <div className="flex-1 px-4 py-3 rounded-lg bg-white border border-gray-200">
+            <div className="flex-1 px-4 py-3 rounded-lg bg-gray-50 border border-gray-200">
               <div className="flex items-center space-x-2">
                 <div className="flex space-x-1">
                   <div className="w-2 h-2 bg-emerald-500 rounded-full typing-dot"></div>
@@ -438,7 +575,7 @@ export function ChatInterface() {
       </div>
 
       {/* Message Input */}
-      <div className="border-t border-gray-200 p-4 bg-white/90">
+      <div className="border-t border-gray-200 p-4 bg-gray-50/90">
         <form onSubmit={sendMessage} className="flex gap-3">
           <Input
             value={input}
