@@ -12,7 +12,6 @@ RETURNS TABLE (
   title TEXT,
   content TEXT,
   category TEXT,
-  location TEXT,
   tags TEXT[],
   similarity FLOAT
 )
@@ -24,7 +23,6 @@ AS $$
     kb.title,
     kb.content,
     kb.category,
-    kb.location,
     kb.tags,
     1 - (kb.embedding <=> query_embedding) AS similarity
   FROM knowledge_base kb
