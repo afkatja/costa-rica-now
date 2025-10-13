@@ -1,296 +1,423 @@
-Deno.serve(async (req) => {
+Deno.serve(async req => {
   const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
-    'Access-Control-Max-Age': '86400',
-    'Access-Control-Allow-Credentials': 'false'
-  };
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE, PATCH",
+    "Access-Control-Max-Age": "86400",
+    "Access-Control-Allow-Credentials": "false",
+  }
 
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 200, headers: corsHeaders })
   }
 
   try {
-    const { message, conversationId, userPreferences = {} } = await req.json();
+    const {
+      message,
+      conversationId,
+      userPreferences = {},
+      locationContext = null,
+    } = await req.json()
 
     if (!message) {
-      throw new Error('Message is required');
+      throw new Error("Message is required")
     }
 
     // Get environment variables
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const openWeatherApiKey = Deno.env.get('OPENWEATHERMAP_API_KEY');
+    const openaiApiKey = Deno.env.get("OPENAI_API_KEY")
+    const groqApiKey = Deno.env.get("GROQ_API_KEY")
+    const huggingfaceApiKey = Deno.env.get("HF_API_KEY")
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+    const openWeatherApiKey = Deno.env.get("OPENWEATHERMAP_API_KEY")
 
-    if (!openaiApiKey || !supabaseUrl || !serviceRoleKey) {
-      throw new Error('Missing required environment variables');
+    // Feature flag: 'openai' or 'free' (groq + huggingface)
+    const AI_PROVIDER = Deno.env.get("AI_PROVIDER") || "free" // default to free
+
+    // Validate required keys based on provider
+    if (AI_PROVIDER === "openai") {
+      if (!openaiApiKey || !supabaseUrl || !serviceRoleKey) {
+        throw new Error(
+          "Missing required environment variables for OpenAI provider"
+        )
+      }
+    } else {
+      if (
+        !groqApiKey ||
+        !huggingfaceApiKey ||
+        !supabaseUrl ||
+        !serviceRoleKey
+      ) {
+        throw new Error(
+          "Missing required environment variables for free provider"
+        )
+      }
     }
+
+    console.log(`Using AI provider: ${AI_PROVIDER}`)
 
     // Get user from auth header
-    const authHeader = req.headers.get('authorization');
+    const authHeader = req.headers.get("authorization")
     if (!authHeader) {
-      throw new Error('Authorization header is required');
+      throw new Error("Authorization header is required")
     }
 
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader.replace("Bearer ", "")
     const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'apikey': serviceRoleKey
-      }
-    });
+        Authorization: `Bearer ${token}`,
+        apikey: serviceRoleKey,
+      },
+    })
 
     if (!userResponse.ok) {
-      throw new Error('Invalid authentication token');
+      throw new Error("Invalid authentication token")
     }
 
-    const userData = await userResponse.json();
-    const userId = userData.id;
+    const userData = await userResponse.json()
+    const userId = userData.id
 
     // Get or create conversation
-    let conversation;
+    let conversation
     if (conversationId) {
       // Get existing conversation
       const convResponse = await fetch(
         `${supabaseUrl}/rest/v1/conversations?id=eq.${conversationId}&user_id=eq.${userId}`,
         {
           headers: {
-            'Authorization': `Bearer ${serviceRoleKey}`,
-            'apikey': serviceRoleKey
-          }
+            Authorization: `Bearer ${serviceRoleKey}`,
+            apikey: serviceRoleKey,
+          },
         }
-      );
-      const conversations = await convResponse.json();
-      conversation = conversations[0];
+      )
+      const conversations = await convResponse.json()
+      conversation = conversations[0]
     }
 
     if (!conversation) {
       // Create new conversation
       const convResponse = await fetch(`${supabaseUrl}/rest/v1/conversations`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${serviceRoleKey}`,
-          'apikey': serviceRoleKey,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
         },
         body: JSON.stringify({
           user_id: userId,
-          title: message.substring(0, 50) + '...',
-          context: { userPreferences }
-        })
-      });
-      const newConversations = await convResponse.json();
-      conversation = newConversations[0];
+          title: message.substring(0, 50) + "...",
+          context: { userPreferences },
+        }),
+      })
+      const newConversations = await convResponse.json()
+      conversation = newConversations[0]
     }
 
     // Save user message
     await fetch(`${supabaseUrl}/rest/v1/messages`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${serviceRoleKey}`,
-        'apikey': serviceRoleKey,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         conversation_id: conversation.id,
-        role: 'user',
-        content: message
-      })
-    });
+        role: "user",
+        content: message,
+      }),
+    })
 
     // Get recent conversation history
     const historyResponse = await fetch(
       `${supabaseUrl}/rest/v1/messages?conversation_id=eq.${conversation.id}&order=created_at.desc&limit=10`,
       {
         headers: {
-          'Authorization': `Bearer ${serviceRoleKey}`,
-          'apikey': serviceRoleKey
-        }
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
+        },
       }
-    );
-    const history = await historyResponse.json();
-    const recentHistory = history.reverse(); // Oldest first
+    )
+    const history = await historyResponse.json()
+    const recentHistory = history.reverse() // Oldest first
 
     // Fetch weather data for context
-    let weatherContext = '';
-    let currentWeather = [];
-    
+    let weatherContext = ""
+    let currentWeather = []
+
     if (openWeatherApiKey) {
       try {
-        // Get weather for major destinations
-        const weatherResponse = await fetch(`${supabaseUrl}/functions/v1/weather-service`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${serviceRoleKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            type: 'current'
-          })
-        });
+        // Get weather for major destinations or user's location
+        const weatherResponse = await fetch(
+          `${supabaseUrl}/functions/v1/weather-service`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${serviceRoleKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              type: "current",
+              locationContext, // Include user's location if available
+            }),
+          }
+        )
 
         if (weatherResponse.ok) {
-          const weatherData = await weatherResponse.json();
-          currentWeather = weatherData.data?.weather || [];
-          
+          const weatherData = await weatherResponse.json()
+          currentWeather = weatherData.data?.weather || []
+
           // Create weather context for AI
-          weatherContext = currentWeather.map(w => 
-            `${w.name}: ${w.current.temperature}°C, ${w.current.description}, humidity ${w.current.humidity}%`
-          ).join('; ');
+          weatherContext = currentWeather
+            .map(
+              w =>
+                `${w.name}: ${w.current.temperature}°C, ${w.current.description}, humidity ${w.current.humidity}%`
+            )
+            .join("; ")
         }
       } catch (weatherError) {
-        console.log('Weather fetch failed, continuing without weather data:', weatherError.message);
+        console.log(
+          "Weather fetch failed, continuing without weather data:",
+          weatherError
+        )
       }
     }
-    
+
     // Fetch events data for context
-    let eventsContext = '';
-    let currentEvents = [];
-    
+    let eventsContext = ""
+    let currentEvents = []
+
     try {
       // Get upcoming events from multiple categories
-      const eventsResponse = await fetch(`${supabaseUrl}/functions/v1/events-service`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${serviceRoleKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'get_upcoming_events',
-          limit: 15
-        })
-      });
-
-      if (eventsResponse.ok) {
-        const eventsData = await eventsResponse.json();
-        currentEvents = eventsData.data?.events || [];
-        
-        // Create events context for AI
-        eventsContext = currentEvents.slice(0, 10).map(event => 
-          `${event.title} (${event.category}) in ${event.location_display || event.location} - ${event.price} - ${event.description?.substring(0, 100)}...`
-        ).join('; ');
-      }
-    } catch (eventsError) {
-      console.log('Events fetch failed, continuing without events data:', eventsError.message);
-    }
-    
-    // Enhanced knowledge search with multiple strategies
-    let relevantKnowledge = [];
-    
-    try {
-      // Strategy 1: Try vector similarity search first
-      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          input: message,
-          model: 'text-embedding-3-small'
-        })
-      });
-
-      if (embeddingResponse.ok) {
-        const embeddingData = await embeddingResponse.json();
-        const queryEmbedding = embeddingData.data[0].embedding;
-
-        const searchResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/search_knowledge`, {
-          method: 'POST',
+      const eventsResponse = await fetch(
+        `${supabaseUrl}/functions/v1/events-service`,
+        {
+          method: "POST",
           headers: {
-            'Authorization': `Bearer ${serviceRoleKey}`,
-            'apikey': serviceRoleKey,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${serviceRoleKey}`,
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            query_embedding: queryEmbedding,
-            match_threshold: 0.7,
-            match_count: 5
-          })
-        });
+            action: "get_upcoming_events",
+            limit: 15,
+            locationContext, // Include user's location if available
+          }),
+        }
+      )
+
+      if (eventsResponse.ok) {
+        const eventsData = await eventsResponse.json()
+        currentEvents = eventsData.data?.events || []
+
+        // Create events context for AI
+        eventsContext = currentEvents
+          .slice(0, 10)
+          .map(
+            (event: Record<string, any>) =>
+              `${event.title} (${event.category}) in ${
+                event.location_display || event.location
+              } - ${event.price} - ${event.description?.substring(0, 100)}...`
+          )
+          .join("; ")
+      }
+    } catch (eventsError) {
+      console.log(
+        "Events fetch failed, continuing without events data:",
+        eventsError
+      )
+    }
+
+    // Enhanced knowledge search with multiple strategies
+    let relevantKnowledge = []
+    let queryEmbedding
+
+    // Generate embeddings based on provider
+    try {
+      if (AI_PROVIDER === "openai") {
+        console.log("Generating embeddings with OpenAI")
+        const embeddingResponse = await fetch(
+          "https://api.openai.com/v1/embeddings",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${openaiApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              input: message,
+              model: "text-embedding-3-small",
+            }),
+          }
+        )
+
+        if (embeddingResponse.ok) {
+          const embeddingData = await embeddingResponse.json()
+          queryEmbedding = embeddingData.data[0].embedding
+        } else {
+          throw new Error(
+            `OpenAI embedding failed: ${await embeddingResponse.text()}`
+          )
+        }
+      } else {
+        console.log("Generating embeddings with HuggingFace")
+        const embeddingResponse = await fetch(
+          "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${huggingfaceApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              inputs: message,
+              options: { wait_for_model: true },
+            }),
+          }
+        )
+
+        if (embeddingResponse.ok) {
+          queryEmbedding = await embeddingResponse.json()
+          // HuggingFace returns array directly, ensure it's the right format
+          if (
+            Array.isArray(queryEmbedding) &&
+            Array.isArray(queryEmbedding[0])
+          ) {
+            queryEmbedding = queryEmbedding[0]
+          }
+        } else {
+          throw new Error(
+            `HuggingFace embedding failed: ${await embeddingResponse.text()}`
+          )
+        }
+      }
+
+      // Search with embeddings if we got them
+      if (queryEmbedding) {
+        const searchResponse = await fetch(
+          `${supabaseUrl}/rest/v1/rpc/search_knowledge`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${serviceRoleKey}`,
+              apikey: serviceRoleKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              query_embedding: queryEmbedding,
+              match_threshold: 0.7,
+              match_count: 5,
+            }),
+          }
+        )
 
         if (searchResponse.ok) {
-          relevantKnowledge = await searchResponse.json();
+          relevantKnowledge = await searchResponse.json()
+          console.log(
+            `Found ${relevantKnowledge.length} results via vector search`
+          )
         }
       }
     } catch (embeddingError) {
-      console.log('Vector search failed, falling back to text search:', embeddingError.message);
+      console.log(
+        "Vector search failed, falling back to text search:",
+        embeddingError
+      )
     }
 
     // Strategy 2: Fallback to text-based search if vector search fails
     if (relevantKnowledge.length === 0) {
-      console.log('Using text-based search fallback');
-      
+      console.log("Using text-based search fallback")
+
       // Create search terms from the message
-      const searchTerms = message.toLowerCase()
+      const searchTerms = message
+        .toLowerCase()
         .split(/\s+/)
-        .filter(term => term.length > 3 && !['what', 'where', 'when', 'how', 'the', 'and', 'for', 'with'].includes(term))
-        .slice(0, 5);
+        .filter(
+          term =>
+            term.length > 3 &&
+            ![
+              "what",
+              "where",
+              "when",
+              "how",
+              "the",
+              "and",
+              "for",
+              "with",
+            ].includes(term)
+        )
+        .slice(0, 5)
 
       if (searchTerms.length > 0) {
         // Search by content using text matching
-        const textSearchQuery = searchTerms.map(term => `content.ilike.%${term}%`).join(',');
-        
+        const textSearchQuery = searchTerms
+          .map(term => `content.ilike.%${term}%`)
+          .join(",")
+
         const textSearchResponse = await fetch(
           `${supabaseUrl}/rest/v1/knowledge_base?or=(${textSearchQuery})&limit=5`,
           {
             headers: {
-              'Authorization': `Bearer ${serviceRoleKey}`,
-              'apikey': serviceRoleKey
-            }
+              Authorization: `Bearer ${serviceRoleKey}`,
+              apikey: serviceRoleKey,
+            },
           }
-        );
+        )
 
         if (textSearchResponse.ok) {
-          const textResults = await textSearchResponse.json();
+          const textResults = await textSearchResponse.json()
           relevantKnowledge = textResults.map(item => ({
             title: item.title,
             content: item.content,
             category: item.category,
             location: item.location,
-            similarity: 0.8 // Assign a default similarity score
-          }));
+            similarity: 0.8, // Assign a default similarity score
+          }))
         }
       }
     }
 
     // Strategy 3: If still no results, get general Costa Rica content
     if (relevantKnowledge.length === 0) {
-      console.log('Using general content fallback');
-      
+      console.log("Using general content fallback")
+
       const generalResponse = await fetch(
         `${supabaseUrl}/rest/v1/knowledge_base?limit=3&order=created_at.desc`,
         {
           headers: {
-            'Authorization': `Bearer ${serviceRoleKey}`,
-            'apikey': serviceRoleKey
-          }
+            Authorization: `Bearer ${serviceRoleKey}`,
+            apikey: serviceRoleKey,
+          },
         }
-      );
+      )
 
       if (generalResponse.ok) {
-        const generalResults = await generalResponse.json();
+        const generalResults = await generalResponse.json()
         relevantKnowledge = generalResults.map(item => ({
           title: item.title,
           content: item.content,
           category: item.category,
           location: item.location,
-          similarity: 0.6 // Lower similarity for general content
-        }));
+          similarity: 0.6, // Lower similarity for general content
+        }))
       }
     }
 
     // Build context for AI
     const knowledgeContext = relevantKnowledge
-      .map(item => `Title: ${item.title}\nLocation: ${item.location || 'General'}\nContent: ${item.content}`)
-      .join('\n\n---\n\n');
+      .map(
+        item =>
+          `Title: ${item.title}\nLocation: ${
+            item.location || "General"
+          }\nContent: ${item.content}`
+      )
+      .join("\n\n---\n\n")
 
     const conversationHistory = recentHistory
       .map(msg => `${msg.role}: ${msg.content}`)
-      .join('\n');
+      .join("\n")
 
     // Create system prompt with Costa Rica travel expertise, weather awareness, and events integration
     const systemPrompt = `You are an expert Costa Rica travel assistant with deep hyperlocal knowledge, real-time weather awareness, and access to current local events. You help travelers plan personalized itineraries with insider insights.
@@ -298,10 +425,10 @@ Deno.serve(async (req) => {
 User preferences: ${JSON.stringify(userPreferences)}
 
 CURRENT WEATHER CONDITIONS (${new Date().toLocaleDateString()}):
-${weatherContext || 'Weather data temporarily unavailable'}
+${weatherContext || "Weather data temporarily unavailable"}
 
 CURRENT EVENTS & ACTIVITIES:
-${eventsContext || 'Events data loading...'}
+${eventsContext || "Events data loading..."}
 
 Relevant knowledge base information:
 ${knowledgeContext}
@@ -332,86 +459,137 @@ Guidelines:
 - Reference knowledge base, weather, and events information when relevant
 - Always mention current weather and relevant events when discussing specific destinations
 
-Respond helpfully to the user's latest message, naturally incorporating weather insights and local events.`;
+Respond helpfully to the user's latest message, naturally incorporating weather insights and local events.`
 
-    // Call OpenAI API
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000
-      })
-    });
+    // Generate AI response based on provider
+    let assistantMessage
+    let modelUsed
 
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text();
-      throw new Error(`OpenAI API error: ${errorText}`);
+    if (AI_PROVIDER === "openai") {
+      console.log("Generating response with OpenAI")
+      const openaiResponse = await fetch(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openaiApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: message },
+            ],
+            temperature: 0.7,
+            max_tokens: 1000,
+          }),
+        }
+      )
+
+      if (!openaiResponse.ok) {
+        const errorText = await openaiResponse.text()
+        throw new Error(`OpenAI API error: ${errorText}`)
+      }
+
+      const aiResponse = await openaiResponse.json()
+      assistantMessage = aiResponse.choices[0].message.content
+      modelUsed = "gpt-4o-mini"
+    } else {
+      console.log("Generating response with Groq")
+      const groqResponse = await fetch(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${groqApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile", // or "llama-3.1-8b-instant" for faster
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: message },
+            ],
+            temperature: 0.7,
+            max_tokens: 1000,
+          }),
+        }
+      )
+
+      if (!groqResponse.ok) {
+        const errorText = await groqResponse.text()
+        throw new Error(`Groq API error: ${errorText}`)
+      }
+
+      const aiResponse = await groqResponse.json()
+      assistantMessage = aiResponse.choices[0].message.content
+      modelUsed = "llama-3.3-70b-versatile"
     }
-
-    const aiResponse = await openaiResponse.json();
-    const assistantMessage = aiResponse.choices[0].message.content;
 
     // Save assistant message
     await fetch(`${supabaseUrl}/rest/v1/messages`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${serviceRoleKey}`,
-        'apikey': serviceRoleKey,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         conversation_id: conversation.id,
-        role: 'assistant',
+        role: "assistant",
         content: assistantMessage,
         metadata: {
-          sources: relevantKnowledge.map(k => ({ title: k.title, category: k.category, location: k.location })),
-          model: 'gpt-4o-mini',
-          search_strategy: relevantKnowledge.length > 0 ? 'knowledge_base' : 'general',
+          sources: relevantKnowledge.map(k => ({
+            title: k.title,
+            category: k.category,
+            location: k.location,
+          })),
+          model: modelUsed,
+          ai_provider: AI_PROVIDER,
+          search_strategy:
+            relevantKnowledge.length > 0 ? "knowledge_base" : "general",
           weather_context: currentWeather.length > 0,
           weather_locations: currentWeather.map(w => w.name),
           events_context: currentEvents.length > 0,
-          events_count: currentEvents.length
-        }
-      })
-    });
+          events_count: currentEvents.length,
+        },
+      }),
+    })
 
-    return new Response(JSON.stringify({
-      data: {
-        message: assistantMessage,
-        conversationId: conversation.id,
-        sources: relevantKnowledge,
-        weather: currentWeather,
-        events: currentEvents.slice(0, 5), // Include top 5 events in response
-        searchStrategy: relevantKnowledge.length > 0 ? 'knowledge_base' : 'general',
-        weatherAvailable: currentWeather.length > 0,
-        eventsAvailable: currentEvents.length > 0
+    return new Response(
+      JSON.stringify({
+        data: {
+          message: assistantMessage,
+          conversationId: conversation.id,
+          sources: relevantKnowledge,
+          weather: currentWeather,
+          events: currentEvents.slice(0, 5), // Include top 5 events in response
+          searchStrategy:
+            relevantKnowledge.length > 0 ? "knowledge_base" : "general",
+          weatherAvailable: currentWeather.length > 0,
+          eventsAvailable: currentEvents.length > 0,
+          aiProvider: AI_PROVIDER,
+          modelUsed: modelUsed,
+        },
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-
+    )
   } catch (error) {
-    console.error('AI chat error:', error);
+    console.error("AI chat error:", error)
 
     const errorResponse = {
       error: {
-        code: 'AI_CHAT_ERROR',
-        message: error.message
-      }
-    };
+        code: "AI_CHAT_ERROR",
+        message: error.message,
+      },
+    }
 
     return new Response(JSON.stringify(errorResponse), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    })
   }
-});
+})
