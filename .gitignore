@@ -9,3 +9,4 @@ supabase/.branches/
 supabase/functions/**/.build/
 
 .DS_Store
+supabase/.temp/cli-latest

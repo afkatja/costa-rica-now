@@ -1,3 +1,5 @@
+import calculateDistance from "../_shared/calculateDistance"
+
 Deno.serve(async req => {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -404,26 +406,6 @@ function filterEventsByLocation(events: any[], locationContext: any): any[] {
     tortuguero: { lat: 10.5475, lon: -83.5049 },
     "san-isidro": { lat: 9.3783, lon: -83.7036 },
     "san-vito": { lat: 8.8218, lon: -82.9705 },
-  }
-
-  // Helper function to calculate distance between two coordinates
-  const calculateDistance = (
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number
-  ): number => {
-    const R = 6371 // Radius of the Earth in kilometers
-    const dLat = ((lat2 - lat1) * Math.PI) / 180
-    const dLon = ((lon2 - lon1) * Math.PI) / 180
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    return R * c
   }
 
   // Filter events by proximity to user's location
