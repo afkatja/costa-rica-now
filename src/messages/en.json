@@ -17,5 +17,33 @@
   "Footer": {
     "title": "Costa Rica Now • News, Weather, Seismic and Volcanic Activity, Itineraries",
     "description": "Real-time local personalized information"
+  },
+  "WeatherPage": {
+    "title": "Weather in Costa Rica",
+    "currentConditions": "Current Conditions",
+    "lastUpdated": "Last updated",
+    "feelsLike": "Feels like",
+    "humidity": "Humidity",
+    "wind": "Wind",
+    "visibility": "Visibility",
+    "pressure": "Pressure",
+    "uv": "UV",
+    "clouds": "Clouds",
+    "forecast5Days": "5-Day Forecast",
+    "weatherMap": "Weather Map",
+    "regionalWeather": "Weather by Regions",
+    "rain": "rain",
+    "weatherData": "Weather Data",
+    "weatherDataDescription": "Connect with OpenWeather API for real-time meteorological data, precipitation maps, radar and detailed forecasts.",
+    "currentTemperature": "Current temperature",
+    "forecast7Days": "7-day forecast",
+    "rainMaps": "Rain maps",
+    "weatherAlerts": "Weather alerts",
+    "temperatureLegend": {
+      "hot": "30°C+",
+      "warm": "25-29°C",
+      "mild": "20-24°C",
+      "cool": "<20°C"
+    }
   }
 }

@@ -17,6 +17,11 @@ const nextConfig = {
         port: "",
       },
       {
+        protocol: "https",
+        hostname: "openweathermap.org",
+        port: "",
+      },
+      {
         protocol: "http",
         hostname: "**.wikipedia.org",
         port: "",
