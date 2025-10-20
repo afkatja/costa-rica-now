@@ -10,3 +10,5 @@ supabase/functions/**/.build/
 
 .DS_Store
 supabase/.temp/cli-latest
+
+certificates

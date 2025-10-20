@@ -132,6 +132,8 @@ export function useGeolocation(options: GeolocationOptions = {}) {
         isInCostaRica,
       })
     } catch (error: any) {
+      console.error("POSITION ERROR", { error })
+
       let errorMessage = "Unable to get your location"
 
       if (error.code === 1) {

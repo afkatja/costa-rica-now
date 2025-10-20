@@ -63,11 +63,11 @@
     "@types/node": "^20.10.0",
     "@types/react": "^18.3.25",
     "@types/react-dom": "^18.3.7",
-    "supabase": "^2.48.3",
+    "supabase": "^2.51.0",
     "typescript": "5.9.3"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --experimental-https",
     "build": "next build"
   }
 }
