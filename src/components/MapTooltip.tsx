@@ -1,31 +1,38 @@
-import { ReactNode } from "react";
-import { Card, CardContent } from "./ui/card";
+import { ReactNode } from "react"
+import { InfoWindow } from "@vis.gl/react-google-maps"
 
 interface MapTooltipProps {
-  children: ReactNode;
-  isVisible: boolean;
-  x: number;
-  y: number;
-  className?: string;
+  children: ReactNode
+  isVisible: boolean
+  x?: number
+  y?: number
+  anchor?: any
+  className?: string
+  onClose?: () => void
+  header: string
 }
 
-export function MapTooltip({ children, isVisible, x, y, className = "" }: MapTooltipProps) {
-  if (!isVisible) return null;
+export function MapTooltip({
+  children,
+  isVisible,
+  x,
+  y,
+  className = "",
+  onClose,
+  header,
+  anchor
+}: MapTooltipProps) {
+  if (!isVisible) return null
 
   return (
-    <div 
-      className={`absolute z-50 pointer-events-none ${className}`}
-      style={{ 
-        left: x, 
-        top: y,
-        transform: 'translate(-50%, -100%)'
-      }}
+    <InfoWindow
+    anchor={anchor}
+      onClose={onClose}
+      headerContent={
+        <h3 className="font-semibold text-lg mb-2 ml-2">{header}</h3>
+      }
     >
-      <Card className="shadow-lg border-2 max-w-xs">
-        <CardContent className="p-3">
-          {children}
-        </CardContent>
-      </Card>
-    </div>
-  );
+      <div className="min-w-[200px]">{children}</div>
+    </InfoWindow>
+  )
 }

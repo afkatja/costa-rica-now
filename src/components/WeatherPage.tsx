@@ -1,15 +1,16 @@
 "use client"
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
-import { Badge } from "./ui/badge"
+
 import { useTranslations } from "next-intl"
 import { useGeolocation } from "../hooks/use-geolocation"
 import { supabase } from "../utils/supabase/client"
-import { Droplets, MapPin } from "lucide-react"
+import { Droplets, MapPin, Eye, Thermometer, Wind } from "lucide-react"
 import { CostaRicaMap } from "./CostaRicaMap"
 import WeatherForecast from "./WeatherForecast"
 import WeatherCurrent from "./WeatherCurrent"
 import costaRicaDestinations from "../lib/shared/destinations"
+import MapTooltipContent from "./MapTooltipContent"
 
 interface WeatherData {
   location: string
@@ -67,6 +68,61 @@ const getRegionalWeather = () => {
   })
 
   return Array.from(regionMap.values())
+}
+
+const getWeatherIcon = (iconCode: string) => {
+  return `https://openweathermap.org/img/wn/${iconCode}@2x.png`
+}
+
+const getDestinations = (weatherData: WeatherData[] | null) => {
+  if (!weatherData) return null
+  const weatherMap: Record<string, WeatherData> = {}
+  weatherData.forEach(
+    (weather: WeatherData) => (weatherMap[weather.location] = weather)
+  )
+
+  const destinations = Object.entries(costaRicaDestinations).map(
+    ([key, dest]: [string, any]) => {
+      const weather = weatherMap?.[key]
+      if (!weather) return { ...dest, content: "No weather data" }
+      return {
+        ...dest,
+        content: (
+          <MapTooltipContent
+            data={{
+              icon: weather.current.icon
+                ? getWeatherIcon(weather.current.icon)
+                : null,
+              description: weather.current.description,
+            }}
+          >
+            <div className="text-2xl font-bold">
+              {weather.current.temperature}°C
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex items-center gap-1">
+                <Thermometer className="w-5 h-5 text-orange-500" />
+                <span>Feels {weather.current.feels_like}°C</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Droplets className="w-5 h-5 text-blue-500" />
+                <span>{weather.current.humidity}%</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Wind className="w-5 h-5 text-gray-500" />
+                <span>{weather.current.wind_speed} m/s</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Eye className="w-5 h-5 text-gray-500" />
+                <span>{Math.round(weather.current.visibility / 1000)} km</span>
+              </div>
+            </div>
+          </MapTooltipContent>
+        ),
+      }
+    }
+  )
+  return destinations
 }
 
 export function WeatherPage() {
@@ -158,6 +214,8 @@ export function WeatherPage() {
         const userForecast = forecastWeather.find(
           (w: any) => w.location === userWeather?.location
         )
+        console.log("USER WEATHER", userWeather)
+
         if (userWeather) setWeatherData(userWeather)
         if (userForecast) setForecastData(userForecast)
       }
@@ -173,8 +231,8 @@ export function WeatherPage() {
 
   // Fetch weather data when component mounts or location changes
   useEffect(() => {
-    fetchWeatherData()
-  }, [position, isInCostaRica])
+    if (!weatherData) fetchWeatherData()
+  }, [weatherData])
 
   // Request location permission on mount
   useEffect(() => {
@@ -235,7 +293,11 @@ export function WeatherPage() {
           <CardTitle className="text-lg font-bold">{t("weatherMap")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <CostaRicaMap />
+          {allWeatherData ? (
+            <CostaRicaMap destinations={getDestinations(allWeatherData)} />
+          ) : (
+            "loading map"
+          )}
         </CardContent>
       </Card>
 

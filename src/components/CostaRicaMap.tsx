@@ -3,14 +3,20 @@ import GoogleMapsWrapper from "./GoogleMapsWrapper"
 interface CostaRicaMapProps {
   children?: React.ReactNode
   className?: string
+  destinations?: any[] | null
 }
 
-export function CostaRicaMap({ children, className = "" }: CostaRicaMapProps) {
+export function CostaRicaMap({
+  children,
+  className = "",
+  destinations,
+}: CostaRicaMapProps) {
+  if (!destinations) return "No data for maps"
   return (
     <div
       className={`relative w-full h-[700px] bg-blue-50 rounded-lg border ${className}`}
     >
-      <GoogleMapsWrapper />
+      <GoogleMapsWrapper destinations={destinations} />
     </div>
   )
 }
