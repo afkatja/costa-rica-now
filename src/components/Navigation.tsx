@@ -11,7 +11,6 @@ export function Navigation({}: NavigationProps) {
   const { Link, usePathname } = createNavigation()
   const t = useTranslations("Navigation")
   const pathname = usePathname()
-  console.log({ pathname })
 
   const pages = [
     { id: "news" as const, labelKey: "news", icon: Newspaper },

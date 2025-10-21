@@ -5,7 +5,13 @@ import WeatherIcons from "../lib/WeatherIcons"
 import { Droplets } from "lucide-react"
 import { useTranslations } from "next-intl"
 
-const WeatherForecast = ({ forecastData }: { forecastData: any }) => {
+const WeatherForecast = ({
+  forecastData,
+  locationName,
+}: {
+  forecastData: any
+  locationName: string
+}) => {
   const { forecast } = mockWeatherData
   const t = useTranslations("WeatherPage")
 
@@ -13,7 +19,7 @@ const WeatherForecast = ({ forecastData }: { forecastData: any }) => {
     <Card>
       <CardHeader>
         <CardTitle className="text-lg font-bold">
-          {t("forecast5Days")}
+          {t("forecast5Days")} {locationName}
         </CardTitle>
       </CardHeader>
       <CardContent>

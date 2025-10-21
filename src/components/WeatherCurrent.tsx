@@ -41,7 +41,7 @@ const WeatherCurrent = ({
     <Card>
       <CardHeader className="flex items-center justify-between">
         <CardTitle className="text-lg font-bold">
-          {t("currentConditions")} for {locationName}
+          {t("currentConditions")} {locationName}
         </CardTitle>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Clock className="h-4 w-4" />
@@ -151,21 +151,26 @@ const WeatherCurrent = ({
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Sun className="h-5 w-5 text-yellow-500" />
-                <span className="text-sm">
-                  {t("uv")}:{" "}
-                  {weatherData
-                    ? weatherData.current.uv_index || "N/A"
-                    : mockCurrent.uvIndex}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CloudRain className="h-5 w-5 text-blue-500" />
-                <span className="text-sm">
-                  {t("clouds")}: {weatherData ? "N/A" : mockCurrent.cloudCover}%
-                </span>
-              </div>
+              {weatherData && weatherData.current.uv_index && (
+                <div className="flex items-center gap-2">
+                  <Sun className="h-5 w-5 text-yellow-500" />
+                  <span className="text-sm">
+                    {t("uv")}:{" "}
+                    {weatherData
+                      ? weatherData.current.uv_index
+                      : mockCurrent.uvIndex}
+                  </span>
+                </div>
+              )}
+              {weatherData && weatherData.current.cloudCover && (
+                <div className="flex items-center gap-2">
+                  <CloudRain className="h-5 w-5 text-blue-500" />
+                  <span className="text-sm">
+                    {t("clouds")}:{" "}
+                    {weatherData ? "N/A" : mockCurrent.cloudCover}%
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}

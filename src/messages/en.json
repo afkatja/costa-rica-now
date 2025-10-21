@@ -20,7 +20,7 @@
   },
   "WeatherPage": {
     "title": "Weather in Costa Rica",
-    "currentConditions": "Current Conditions",
+    "currentConditions": "Current Conditions for",
     "lastUpdated": "Last updated",
     "feelsLike": "Feels like",
     "humidity": "Humidity",
@@ -29,7 +29,7 @@
     "pressure": "Pressure",
     "uv": "UV",
     "clouds": "Clouds",
-    "forecast5Days": "5-Day Forecast",
+    "forecast5Days": "5-Day Forecast for",
     "weatherMap": "Weather Map",
     "regionalWeather": "Weather by Regions",
     "rain": "rain",

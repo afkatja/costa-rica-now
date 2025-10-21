@@ -150,6 +150,7 @@ export function WeatherPage() {
           )
 
           userWeather = closest
+
           setLocationName(closest.name)
         } else {
           setLocationName("San José")
@@ -223,7 +224,10 @@ export function WeatherPage() {
       />
 
       {/* 5-Day Forecast */}
-      <WeatherForecast forecastData={forecastData} />
+      <WeatherForecast
+        forecastData={forecastData}
+        locationName={locationName}
+      />
 
       {/* Weather Map */}
       <Card>

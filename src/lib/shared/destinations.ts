@@ -67,6 +67,12 @@ const costaRicaDestinations = {
     lon: -82.9705,
     region: "Southern Mountains / Talamanca",
   },
+  samara: {
+    name: "Sámara",
+    lat: 9.8826,
+    lon: -85.52822,
+    region: "Guanacaste",
+  },
 }
 
 export default costaRicaDestinations
