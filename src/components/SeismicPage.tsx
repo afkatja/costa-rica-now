@@ -1,62 +1,85 @@
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Badge } from "./ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { SeismicMap } from "./SeismicMap";
-import { mockSeismicData } from "../utils/mockSeismicData";
-import { 
-  Activity, 
-  MapPin, 
-  Clock, 
+"use client"
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
+import { Badge } from "./ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
+import { SeismicMap } from "./SeismicMap"
+import { mockSeismicData } from "../utils/mockSeismicData"
+import {
+  Activity,
   AlertTriangle,
   Mountain,
   Thermometer,
-  TrendingUp
-} from "lucide-react";
+  Loader2,
+} from "lucide-react"
+import { useEffect, useState } from "react"
+import { supabase } from "../utils/supabase/client"
+import { useGeolocation } from "../hooks/use-geolocation"
+import Earthquakes from "./Earthquakes"
+import Volcanoes from "./Volcanoes"
+
+export const formatDateTime = (timeString: string) => {
+  return new Date(timeString).toLocaleString("es-CR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
 
 export function SeismicPage() {
-  const { earthquakes, volcanoes } = mockSeismicData;
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [earthquakes, setEarthquakes] = useState<any | null>(null)
+  const {
+    position,
+    loading: geoLoading,
+    error: geoError,
+    requestLocation,
+    isInCostaRica,
+  } = useGeolocation()
+  const { volcanoes } = mockSeismicData
 
-  const formatDateTime = (timeString: string) => {
-    return new Date(timeString).toLocaleString('es-CR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getMagnitudeColor = (magnitude: number) => {
-    if (magnitude >= 6) return "text-red-600";
-    if (magnitude >= 4.5) return "text-orange-500";
-    if (magnitude >= 3) return "text-yellow-600";
-    return "text-green-600";
-  };
-
-  const getMagnitudeBadge = (magnitude: number) => {
-    if (magnitude >= 6) return "destructive";
-    if (magnitude >= 4.5) return "secondary";
-    return "outline";
-  };
-
-  const getAlertLevelColor = (level: string) => {
-    switch (level) {
-      case "Roja": return "bg-red-500";
-      case "Naranja": return "bg-orange-500";
-      case "Amarilla": return "bg-yellow-500";
-      case "Verde": return "bg-green-500";
-      default: return "bg-gray-500";
+  // Request location permission on mount
+  useEffect(() => {
+    if (!position && !geoLoading && !geoError) {
+      requestLocation()
     }
-  };
+    // if (geoError) setError(geoError)
+  }, [position, geoLoading, geoError, requestLocation])
 
-  const getVolcanoStatusColor = (status: string) => {
-    switch (status) {
-      case "Activo": return "text-orange-600";
-      case "Durmiente": return "text-blue-600";
-      case "Extinto": return "text-gray-600";
-      default: return "text-gray-600";
+  useEffect(() => {
+    let cancelled = false
+    const fetchSeismicData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        const response = await supabase.functions.invoke("seismic-service", {
+          body: {
+            startDate: new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000),
+            endDate: new Date(),
+            type: "earthquake",
+          },
+        })
+        if (!cancelled) {
+          console.log("SEISMIC DATA", { response })
+          setEarthquakes(response.data.events)
+        }
+      } catch (error) {
+        console.error("Error fetching seismic data", error)
+        setError(error)
+      } finally {
+        setLoading(false)
+      }
     }
-  };
+
+    fetchSeismicData()
+
+    return () => {
+      cancelled = true // Cleanup function
+    }
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -71,51 +94,29 @@ export function SeismicPage() {
           <CardTitle>Mapa de Actividad Sísmica y Volcánica</CardTitle>
         </CardHeader>
         <CardContent>
-          <SeismicMap />
-          <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
-            <div>
-              <h5 className="font-medium mb-2">Sismos por Magnitud</h5>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-600"></div>
-                  <span>M 6.0+</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-orange-600"></div>
-                  <span>M 4.5-5.9</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-yellow-600"></div>
-                  <span>M 3.0-4.4</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-green-600"></div>
-                  <span>M &lt;3.0</span>
-                </div>
-              </div>
+          {loading || geoLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground">
+                Loading seismic data...
+              </span>
             </div>
-            <div>
-              <h5 className="font-medium mb-2">Volcanes por Alerta</h5>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-600"></div>
-                  <span>Alerta Roja</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-orange-600"></div>
-                  <span>Alerta Naranja</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-yellow-600"></div>
-                  <span>Alerta Amarilla</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-green-600"></div>
-                  <span>Alerta Verde</span>
-                </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <div className="text-red-500 mb-2">
+                Failed to load seismic data
               </div>
+              <div className="text-sm text-muted-foreground mb-4">{error}</div>
+              <button
+                onClick={fetchSeismicData}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+              >
+                Retry
+              </button>
             </div>
-          </div>
+          ) : (
+            <SeismicMap locations={earthquakes} />
+          )}
         </CardContent>
       </Card>
 
@@ -132,208 +133,11 @@ export function SeismicPage() {
         </TabsList>
 
         <TabsContent value="earthquakes" className="space-y-4">
-          {/* Earthquakes Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-blue-500" />
-                  <div>
-                    <div className="text-2xl font-medium">{earthquakes.length}</div>
-                    <div className="text-sm text-muted-foreground">Sismos últimos 7 días</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-orange-500" />
-                  <div>
-                    <div className="text-2xl font-medium">
-                      {Math.max(...earthquakes.map(e => e.magnitude)).toFixed(1)}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Magnitud máxima</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                  <div>
-                    <div className="text-2xl font-medium">
-                      {earthquakes.filter(e => e.felt).length}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Sismos percibidos</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Recent Earthquakes */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Sismos Recientes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {earthquakes.map((earthquake) => (
-                  <div key={earthquake.id} className="border rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Badge 
-                          variant={getMagnitudeBadge(earthquake.magnitude)}
-                          className={getMagnitudeColor(earthquake.magnitude)}
-                        >
-                          M {earthquake.magnitude}
-                        </Badge>
-                        <span className="font-medium">{earthquake.intensity}</span>
-                        {earthquake.felt && (
-                          <Badge variant="outline" className="text-xs">
-                            Percibido
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {earthquake.reports} reportes
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        {earthquake.location}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        {formatDateTime(earthquake.time)}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Profundidad: {earthquake.depth} km
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <Earthquakes earthquakes={earthquakes} />
         </TabsContent>
 
         <TabsContent value="volcanoes" className="space-y-4">
-          {/* Volcano Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2">
-                  <Mountain className="h-5 w-5 text-red-500" />
-                  <div>
-                    <div className="text-2xl font-medium">
-                      {volcanoes.filter(v => v.status === "Activo").length}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Volcanes activos</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-orange-500" />
-                  <div>
-                    <div className="text-2xl font-medium">
-                      {volcanoes.filter(v => v.alertLevel === "Naranja" || v.alertLevel === "Roja").length}
-                    </div>
-                    <div className="text-sm text-muted-foreground">En alerta</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2">
-                  <Thermometer className="h-5 w-5 text-yellow-500" />
-                  <div>
-                    <div className="text-2xl font-medium">
-                      {Math.max(...volcanoes.map(v => v.temperature))}°C
-                    </div>
-                    <div className="text-sm text-muted-foreground">Temp. máxima</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Volcano Activity */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Actividad Volcánica</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {volcanoes.map((volcano) => (
-                  <div key={volcano.id} className="border rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <Mountain className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <h4 className="font-medium">{volcano.name}</h4>
-                          <div className="text-sm text-muted-foreground">
-                            Elevación: {volcano.elevation} m
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className={`w-3 h-3 rounded-full ${getAlertLevelColor(volcano.alertLevel)}`}
-                        />
-                        <span className="text-sm font-medium">
-                          Alerta {volcano.alertLevel}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">Estado:</span>
-                          <span className={`text-sm ${getVolcanoStatusColor(volcano.status)}`}>
-                            {volcano.status}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Thermometer className="h-4 w-4 text-orange-500" />
-                          <span className="text-sm">{volcano.temperature}°C</span>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Última erupción: {formatDateTime(volcano.lastEruption)}
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <div className="text-sm">
-                          <span className="font-medium">Actividad actual:</span>
-                          <div className="mt-1">{volcano.activity}</div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-3 pt-3 border-t">
-                      <p className="text-sm text-muted-foreground">
-                        {volcano.description}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <Volcanoes volcanoes={volcanoes} />
         </TabsContent>
       </Tabs>
 
@@ -343,7 +147,8 @@ export function SeismicPage() {
           <div className="text-center space-y-2">
             <h4>Datos Sísmicos y Volcánicos</h4>
             <p className="text-sm text-muted-foreground">
-              Conecte con USGS APIs para datos en tiempo real de terremotos, actividad volcánica y alertas sísmicas.
+              Conecte con USGS APIs para datos en tiempo real de terremotos,
+              actividad volcánica y alertas sísmicas.
             </p>
             <div className="flex flex-wrap gap-2 justify-center mt-3">
               <Badge variant="outline">USGS Earthquake API</Badge>
@@ -355,5 +160,5 @@ export function SeismicPage() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
