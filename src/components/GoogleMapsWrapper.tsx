@@ -1,83 +1,65 @@
 "use client"
-import React, { useEffect, useState } from "react"
+import React, { useCallback, useMemo, useRef, useState, useEffect } from "react"
 import {
-  AdvancedMarker,
   APIProvider,
   Map,
-  useAdvancedMarkerRef,
+  useApiIsLoaded,
+  useMap,
 } from "@vis.gl/react-google-maps"
-import Image from "next/image"
-import { MapTooltip } from "./MapTooltip"
+import {
+  type Marker as MarkerType,
+  MarkerClusterer,
+  SuperClusterAlgorithm,
+} from "@googlemaps/markerclusterer"
+import MapComponent from "./Map"
 
 const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY!
 
-interface WeatherData {
-  location: string
-  name: string
-  type: string
-  current: {
-    temperature: number
-    feels_like: number
-    humidity: number
-    description: string
-    main: string
-    icon: string
-    wind_speed: number
-    pressure: number
-    visibility: number
-    uv_index: number | null
+const GoogleMapsWrapper = ({
+  destinations,
+}: {
+  destinations: any[] | Record<string, any> | null
+}) => {
+  const [loaded, setLoaded] = useState(false)
+
+  const destinationList = useMemo(() => {
+    if (!destinations) return []
+    if (Array.isArray(destinations)) return destinations
+    return Object.entries(destinations).map(([id, dest]) => ({
+      id,
+      ...(dest as any),
+    }))
+  }, [destinations])
+
+  const MAX_MARKERS = 300
+  const visibleDestinations = useMemo(
+    () => destinationList.slice(0, MAX_MARKERS),
+    [destinationList]
+  )
+
+  const clustererRef = useRef<MarkerClusterer | null>(null)
+
+  const ApiReadyWatcher = ({
+    onReady,
+  }: {
+    onReady: (ready: boolean) => void
+  }) => {
+    const ready = useApiIsLoaded()
+    useEffect(() => {
+      onReady(ready)
+    }, [ready, onReady])
+
+    return null
   }
-  city: string
-  country: string
-  cached_at: string
-}
-
-const GoogleMapsWrapper = ({ destinations }: { destinations: any[] }) => {
-  const [infoVisible, setInfoVisible] = useState<string | null>(null)
-
-  // Create marker refs for each destination
-  const markerRefs = destinations.map(() => useAdvancedMarkerRef())
 
   return (
     <APIProvider apiKey={apiKey}>
-      <Map
-        mapId={process.env.NEXT_PUBLIC_GMAPS_MAP_ID as string}
-        style={{ width: "100%", height: "100%" }}
-        defaultCenter={{ lat: 9.9092, lng: -83.7417 }}
-        defaultZoom={8}
-      >
-        {destinations.map((destination, index) => {
-          const [markerRef, marker] = markerRefs[index]
-          const key = destination.name
-          return (
-            <div key={`map-marker-${key}`}>
-              <AdvancedMarker
-                position={{ lat: destination.lat, lng: destination.lon }}
-                title={destination.name}
-                onClick={() => setInfoVisible(key)}
-                ref={markerRef}
-              >
-                <Image
-                  alt="map marker"
-                  src="/marker.svg"
-                  height={20}
-                  width={26}
-                />
-              </AdvancedMarker>
-
-              <MapTooltip
-                key={`map-tooltip-${key}`}
-                isVisible={key === infoVisible}
-                anchor={marker}
-                onClose={() => setInfoVisible(null)}
-                header={destination.name}
-              >
-                {destination.content}
-              </MapTooltip>
-            </div>
-          )
-        })}
-      </Map>
+      <ApiReadyWatcher onReady={setLoaded} />
+      {!loaded ? (
+        <div>Loading map...</div>
+      ) : (
+        <MapComponent destinations={visibleDestinations} />
+      )}
     </APIProvider>
   )
 }
