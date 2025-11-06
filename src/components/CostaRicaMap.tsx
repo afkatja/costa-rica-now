@@ -4,19 +4,27 @@ interface CostaRicaMapProps {
   children?: React.ReactNode
   className?: string
   destinations?: any[] | null
+  radarTileUrl?: string | null
+  radarOpacity?: number
 }
 
 export function CostaRicaMap({
   children,
   className = "",
   destinations,
+  radarTileUrl,
+  radarOpacity,
 }: CostaRicaMapProps) {
   if (!destinations) return "No data for maps"
   return (
     <div
       className={`relative w-full h-[700px] bg-blue-50 rounded-lg border ${className}`}
     >
-      <GoogleMapsWrapper destinations={destinations} />
+      <GoogleMapsWrapper 
+        destinations={destinations} 
+        radarTileUrl={radarTileUrl}
+        radarOpacity={radarOpacity}
+      />
     </div>
   )
 }

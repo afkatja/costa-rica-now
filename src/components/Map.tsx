@@ -6,7 +6,17 @@ import Marker, { baseColorScheme } from "./Marker"
 import { useMap, Map, AdvancedMarker } from "@vis.gl/react-google-maps"
 import { MapTooltip } from "./MapTooltip"
 
-const MapComponent = ({ destinations }: { destinations: any[] }) => {
+interface MapComponentProps {
+  destinations: any[]
+  radarTileUrl?: string | null
+  radarOpacity?: number
+}
+
+const MapComponent = ({ 
+  destinations, 
+  radarTileUrl, 
+  radarOpacity = 0.6 
+}: MapComponentProps) => {
   const superclusterRef = useRef<Supercluster | null>(null)
 
   const [bounds, setBounds] = useState<
@@ -21,6 +31,7 @@ const MapComponent = ({ destinations }: { destinations: any[] }) => {
   } | null>(null)
 
   const map = useMap()
+  const radarOverlayRef = useRef<google.maps.ImageMapType | null>(null)
 
   useEffect(() => {
     if (!destinations) return
@@ -48,6 +59,51 @@ const MapComponent = ({ destinations }: { destinations: any[] }) => {
     // cast points to any to satisfy Supercluster's expected PointFeature typing
     superclusterRef.current.load(points as any)
   }, [destinations])
+
+  // Radar overlay effect
+  useEffect(() => {
+    if (!map) return
+
+    // Remove existing radar overlay if present
+    if (radarOverlayRef.current) {
+      const overlays = map.overlayMapTypes
+      const index = overlays.getArray().indexOf(radarOverlayRef.current)
+      if (index !== -1) {
+        overlays.removeAt(index)
+      }
+      radarOverlayRef.current = null
+    }
+
+    // Add new radar overlay if URL is provided
+    if (radarTileUrl) {
+      const radarMapType = new google.maps.ImageMapType({
+        getTileUrl: (coord, zoom) => {
+          return radarTileUrl
+            .replace("{z}", zoom.toString())
+            .replace("{x}", coord.x.toString())
+            .replace("{y}", coord.y.toString())
+        },
+        tileSize: new google.maps.Size(256, 256),
+        opacity: radarOpacity,
+        name: "Radar",
+        maxZoom: 12,
+        minZoom: 0,
+      })
+
+      radarOverlayRef.current = radarMapType
+      map.overlayMapTypes.push(radarMapType)
+    }
+
+    return () => {
+      if (radarOverlayRef.current) {
+        const overlays = map.overlayMapTypes
+        const index = overlays.getArray().indexOf(radarOverlayRef.current)
+        if (index !== -1) {
+          overlays.removeAt(index)
+        }
+      }
+    }
+  }, [map, radarTileUrl, radarOpacity])
 
   useEffect(() => {
     if (!map) return

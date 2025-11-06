@@ -1,14 +1,17 @@
 "use client"
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 
 import { useTranslations } from "next-intl"
 import { useGeolocation } from "../hooks/use-geolocation"
 import { supabase } from "../utils/supabase/client"
-import { Droplets, MapPin, Eye, Thermometer, Wind } from "lucide-react"
+import { Droplets, MapPin, Eye, Thermometer, Wind, CloudRain } from "lucide-react"
 import { CostaRicaMap } from "./CostaRicaMap"
 import WeatherForecast from "./WeatherForecast"
 import WeatherCurrent from "./WeatherCurrent"
+import { RadarControls } from "./RadarControls"
+import { useRainViewer } from "../hooks/use-rainviewer"
 import costaRicaDestinations from "../lib/shared/destinations"
 import MapTooltipContent from "./MapTooltipContent"
 
@@ -144,6 +147,21 @@ export function WeatherPage() {
   const [weatherLoading, setWeatherLoading] = useState(false)
   const [weatherError, setWeatherError] = useState<string | null>(null)
   const [locationName, setLocationName] = useState("San José")
+  
+  // Radar state
+  const [radarOpacity, setRadarOpacity] = useState(0.6)
+  const {
+    currentFrame,
+    currentFrameIndex,
+    allFrames,
+    getTileUrl,
+    nextFrame,
+    previousFrame,
+    goToFrame,
+    isPlaying,
+    togglePlayback,
+    refresh: refreshRadar,
+  } = useRainViewer()
 
   const allLocationKeys = Object.keys(costaRicaDestinations)
 
@@ -287,17 +305,61 @@ export function WeatherPage() {
         locationName={locationName}
       />
 
-      {/* Weather Map */}
+      {/* Weather Map with Radar */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg font-bold">{t("weatherMap")}</CardTitle>
         </CardHeader>
         <CardContent>
-          {allWeatherData ? (
-            <CostaRicaMap destinations={getDestinations(allWeatherData)} />
-          ) : (
-            "loading map"
-          )}
+          <Tabs defaultValue="weather" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="weather">
+                <MapPin className="h-4 w-4 mr-2" />
+                Weather Data
+              </TabsTrigger>
+              <TabsTrigger value="radar">
+                <CloudRain className="h-4 w-4 mr-2" />
+                Radar
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="weather" className="mt-0">
+              {allWeatherData ? (
+                <CostaRicaMap destinations={getDestinations(allWeatherData)} />
+              ) : (
+                <div className="h-[700px] flex items-center justify-center">
+                  Loading weather data...
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="radar" className="mt-0 space-y-4">
+              <RadarControls
+                isPlaying={isPlaying}
+                currentFrameIndex={currentFrameIndex}
+                totalFrames={allFrames.length}
+                currentFrameTime={currentFrame?.time || null}
+                onTogglePlayback={togglePlayback}
+                onPreviousFrame={previousFrame}
+                onNextFrame={nextFrame}
+                onGoToFrame={goToFrame}
+                onRefresh={refreshRadar}
+                opacity={radarOpacity}
+                onOpacityChange={setRadarOpacity}
+              />
+              {allWeatherData ? (
+                <CostaRicaMap 
+                  destinations={getDestinations(allWeatherData)}
+                  radarTileUrl={getTileUrl(currentFrame)}
+                  radarOpacity={radarOpacity}
+                />
+              ) : (
+                <div className="h-[700px] flex items-center justify-center">
+                  Loading map...
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 

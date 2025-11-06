@@ -15,11 +15,17 @@ import MapComponent from "./Map"
 
 const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY!
 
+interface GoogleMapsWrapperProps {
+  destinations: any[] | Record<string, any> | null
+  radarTileUrl?: string | null
+  radarOpacity?: number
+}
+
 const GoogleMapsWrapper = ({
   destinations,
-}: {
-  destinations: any[] | Record<string, any> | null
-}) => {
+  radarTileUrl,
+  radarOpacity,
+}: GoogleMapsWrapperProps) => {
   const [loaded, setLoaded] = useState(false)
 
   const destinationList = useMemo(() => {
@@ -58,7 +64,11 @@ const GoogleMapsWrapper = ({
       {!loaded ? (
         <div>Loading map...</div>
       ) : (
-        <MapComponent destinations={visibleDestinations} />
+        <MapComponent 
+          destinations={visibleDestinations} 
+          radarTileUrl={radarTileUrl}
+          radarOpacity={radarOpacity}
+        />
       )}
     </APIProvider>
   )
