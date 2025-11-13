@@ -18,6 +18,11 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "static.vecteezy.com",
+        port: "",
+      },
+      {
+        protocol: "https",
         hostname: "openweathermap.org",
         port: "",
       },
