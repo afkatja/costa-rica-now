@@ -325,7 +325,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Queue the request for staggered processing
-    return new Promise((resolve, reject) => {
+    return new Promise<Response>((resolve, reject) => {
       requestQueue.push({
         resolve,
         reject,

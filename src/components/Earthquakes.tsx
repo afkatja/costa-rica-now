@@ -58,7 +58,9 @@ const Earthquakes = ({ earthquakes }: { earthquakes: any | null }) => {
               <TrendingUp className="h-5 w-5 text-orange-500" />
               <div>
                 <div className="text-2xl font-medium">
-                  {Math.max(...earthquakes.map(e => e.magnitude)).toFixed(1)}
+                  {Math.max(
+                    ...earthquakes.map((e: any) => e.magnitude)
+                  ).toFixed(1)}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   Magnitud máxima
@@ -74,7 +76,7 @@ const Earthquakes = ({ earthquakes }: { earthquakes: any | null }) => {
               <AlertTriangle className="h-5 w-5 text-yellow-500" />
               <div>
                 <div className="text-2xl font-medium">
-                  {earthquakes.filter(e => e.felt).length}
+                  {earthquakes.filter((e: any) => e.felt).length}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   Sismos percibidos
@@ -92,7 +94,7 @@ const Earthquakes = ({ earthquakes }: { earthquakes: any | null }) => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {earthquakes.map(earthquake => (
+            {earthquakes.map((earthquake: any) => (
               <div key={earthquake.id} className="border rounded-lg p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
