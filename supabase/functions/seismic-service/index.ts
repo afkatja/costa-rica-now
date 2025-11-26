@@ -31,7 +31,7 @@ const COSTA_RICA_BOUNDS = {
 // Unified event structure
 interface SeismicEvent {
   id: string
-  source: "usgs" | "ovsicori" | "manual"
+  source: "rsn" | "usgs" | "ovsicori" | "manual"
   magnitude: number
   location: string
   lat: number
@@ -164,6 +164,57 @@ async function fetchOVSICORIData(params: FetchParams): Promise<SeismicEvent[]> {
   }
 }
 
+// Fetch RSN data
+async function fetchRSNData(params: FetchParams): Promise<SeismicEvent[]> {
+  const { startDate, endDate, minMagnitude = 2.5, maxMagnitude } = params
+
+  const queryParams = new URLSearchParams({
+    format: "geojson",
+    starttime: startDate,
+    endtime: endDate,
+    minlatitude: COSTA_RICA_BOUNDS.minLatitude.toString(),
+    maxlatitude: COSTA_RICA_BOUNDS.maxLatitude.toString(),
+    minlongitude: COSTA_RICA_BOUNDS.minLongitude.toString(),
+    maxlongitude: COSTA_RICA_BOUNDS.maxLongitude.toString(),
+    minmagnitude: minMagnitude.toString(),
+  })
+
+  if (maxMagnitude !== undefined) {
+    queryParams.append("maxmagnitude", maxMagnitude.toString())
+  }
+
+  // IRIS provides access to RSN (TC network) data
+  const url = `http://service.iris.edu/fdsnws/event/1/query?${queryParams.toString()}&network=TC`
+
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "Supabase-Edge-Function/1.0",
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`RSN API error: ${response.status} ${response.statusText}`)
+  }
+
+  const data = await response.json()
+
+  return data.features.map((feature: any) => ({
+    id: `rsn-${feature.id}`,
+    source: "rsn" as const,
+    magnitude: feature.properties.mag,
+    location: feature.properties.place,
+    lat: feature.geometry.coordinates[1],
+    lon: feature.geometry.coordinates[0],
+    depth: feature.geometry.coordinates[2],
+    time: feature.properties.time,
+    felt: feature.properties.felt,
+    intensity: feature.properties.cdi,
+    tsunami: feature.properties.tsunami === 1,
+    url: feature.properties.url,
+    status: feature.properties.status,
+  }))
+}
+
 // Deduplicate events based on proximity, time, and magnitude
 function deduplicateEvents(events: SeismicEvent[]): SeismicEvent[] {
   const deduplicated: SeismicEvent[] = []
@@ -202,12 +253,17 @@ function deduplicateEvents(events: SeismicEvent[]): SeismicEvent[] {
         )
       })
 
-      if (
-        existingIndex !== -1 &&
-        event.source === "ovsicori" &&
-        deduplicated[existingIndex].source === "usgs"
-      ) {
-        deduplicated[existingIndex] = event // Replace USGS with OVSICORI
+      // Prefer RSN > OVSICORI > USGS for duplicates
+      if (existingIndex !== -1) {
+        const existing = deduplicated[existingIndex]
+        // RSN takes priority over all
+        if (event.source === "rsn" && existing.source !== "rsn") {
+          deduplicated[existingIndex] = event
+        }
+        // OVSICORI takes priority over USGS only
+        else if (event.source === "ovsicori" && existing.source === "usgs") {
+          deduplicated[existingIndex] = event
+        }
       }
     }
   }
