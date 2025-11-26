@@ -45,3 +45,20 @@ export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
   return text.substring(0, maxLength) + "..."
 }
+
+function isEnumMember({
+  value,
+  enumType,
+}: {
+  value: string
+  enumType: Record<string, any>
+}): boolean {
+  return Object.values(enumType).includes(value as unknown as typeof enumType)
+}
+
+export function stringToEnum<T extends Record<string, string>>(inputString: string, enumType: T): T[keyof T] | undefined {
+  if (isEnumMember({value: inputString, enumType})) {
+    return inputString as T[keyof T]
+  }
+  return undefined
+}
