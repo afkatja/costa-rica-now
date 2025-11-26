@@ -1,30 +1,23 @@
 "use client"
-import React, { useCallback, useMemo, useRef, useState, useEffect } from "react"
-import {
-  APIProvider,
-  Map,
-  useApiIsLoaded,
-  useMap,
-} from "@vis.gl/react-google-maps"
-import {
-  type Marker as MarkerType,
-  MarkerClusterer,
-  SuperClusterAlgorithm,
-} from "@googlemaps/markerclusterer"
-import MapComponent from "./Map"
+import React, { useMemo, useState, useEffect } from "react"
+import { APIProvider, useApiIsLoaded } from "@vis.gl/react-google-maps"
+import BaseMap from "./BaseMap"
+import RadarMap from "./RadarMap"
 
 const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY!
 
 interface GoogleMapsWrapperProps {
   destinations: any[] | Record<string, any> | null
-  radarTileUrl?: string | null
   radarOpacity?: number
+  withRadar?: boolean
+  className?: string
 }
 
 const GoogleMapsWrapper = ({
   destinations,
-  radarTileUrl,
   radarOpacity,
+  withRadar = false,
+  className = ''
 }: GoogleMapsWrapperProps) => {
   const [loaded, setLoaded] = useState(false)
 
@@ -43,8 +36,6 @@ const GoogleMapsWrapper = ({
     [destinationList]
   )
 
-  const clustererRef = useRef<MarkerClusterer | null>(null)
-
   const ApiReadyWatcher = ({
     onReady,
   }: {
@@ -61,15 +52,20 @@ const GoogleMapsWrapper = ({
   return (
     <APIProvider apiKey={apiKey}>
       <ApiReadyWatcher onReady={setLoaded} />
-      {!loaded ? (
-        <div>Loading map...</div>
-      ) : (
-        <MapComponent 
-          destinations={visibleDestinations} 
-          radarTileUrl={radarTileUrl}
-          radarOpacity={radarOpacity}
-        />
-      )}
+      <div
+        className={`relative w-full h-[700px] bg-blue-50 rounded-lg border ${className}`}
+      >
+        {!loaded ? (
+          <div>Loading map...</div>
+        ) : withRadar ? (
+          <RadarMap
+            destinations={visibleDestinations}
+            radarOpacity={radarOpacity}
+          />
+        ) : (
+          <BaseMap destinations={visibleDestinations} />
+        )}
+      </div>
     </APIProvider>
   )
 }

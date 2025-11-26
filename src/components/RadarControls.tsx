@@ -121,7 +121,7 @@ export function RadarControls({
       </div>
 
       {/* Legend */}
-      <div className="pt-2 border-t">
+      {/* <div className="pt-2 border-t">
         <div className="text-xs font-medium mb-2">Precipitation Intensity</div>
         <div className="flex items-center gap-2 text-xs">
           <div className="flex items-center gap-1">
@@ -141,7 +141,7 @@ export function RadarControls({
             <span>Extreme</span>
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   )
 }
