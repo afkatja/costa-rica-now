@@ -1,6 +1,6 @@
 "use client"
 
-import { CostaRicaMap } from "./CostaRicaMap"
+import GoogleMapsWrapper from "./GoogleMapsWrapper"
 import TidesInfoWindow from "./TidesInfoWindow"
 import { coastalDestinations } from "@/lib/shared/destinations"
 
@@ -31,7 +31,7 @@ export default function BeachConditionsMap() {
 
   return (
     <div className="space-y-4">
-      <CostaRicaMap destinations={destinationsWithContent} />
+      <GoogleMapsWrapper destinations={destinationsWithContent} />
     </div>
   )
 }
