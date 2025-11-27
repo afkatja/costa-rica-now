@@ -44,6 +44,18 @@
       "warm": "25-29°C",
       "mild": "20-24°C",
       "cool": "<20°C"
+    },
+    "regionalWeather": {
+      "precipitation": "Precipitation",
+      "status": "Status",
+      "active": "Active",
+      "unavailable": "Unavailable",
+      "updated": "Updated",
+      "coastalConditions": "Coastal Conditions",
+      "waves": "waves",
+      "surf": "Surf",
+      "tide": "Tide",
+      "noData": "No data available for {tab} tab"
     }
   }
 }
