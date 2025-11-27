@@ -14,7 +14,18 @@ import {
 } from "lucide-react"
 import { formatDateTime } from "./SeismicPage"
 
-const Earthquakes = ({ earthquakes }: { earthquakes: any | null }) => {
+type Earthquake = {
+  id: string
+  magnitude: number
+  felt: boolean
+  intensity: string
+  reports: number
+  location: string
+  time: string | number | Date
+  depth: number
+}
+
+const Earthquakes = ({ earthquakes }: { earthquakes: Earthquake[] | null }) => {
   const getMagnitudeColor = (magnitude: number) => {
     if (magnitude >= 6) return "text-red-600"
     if (magnitude >= 4.5) return "text-orange-500"
@@ -27,6 +38,11 @@ const Earthquakes = ({ earthquakes }: { earthquakes: any | null }) => {
     if (magnitude >= 4.5) return "secondary"
     return "outline"
   }
+
+  const maxMagnitude =
+    earthquakes && earthquakes.length
+      ? Math.max(...earthquakes.map(e => e.magnitude))
+      : null
 
   if (!earthquakes)
     return (
@@ -58,9 +74,7 @@ const Earthquakes = ({ earthquakes }: { earthquakes: any | null }) => {
               <TrendingUp className="h-5 w-5 text-orange-500" />
               <div>
                 <div className="text-2xl font-medium">
-                  {Math.max(
-                    ...earthquakes.map((e: any) => e.magnitude)
-                  ).toFixed(1)}
+                  {maxMagnitude ? `M ${maxMagnitude}` : "N/A"}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   Magnitud máxima
