@@ -107,7 +107,7 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
           {regionalData.length > 0 ? (
             regionalData.map((item: any, index) => (
               <div
-                key={`${item.region}-${item.type}=${index}`}
+                key={`${item.region}-${item.type}-${index}`}
                 className={`p-4 rounded-lg border ${item.type}`}
               >
                 <h5 className="font-medium mb-2">
@@ -133,14 +133,14 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
                   <>
                     <div className="flex items-center gap-2 mb-2">
                       <CloudRain className="h-5 w-5 text-blue-500" />
-                      <p className="text-sm font-medium">Precipitation</p>
+                      <p className="text-sm font-medium">{t("regionalWeather.precipitation")}</p>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Status: {item.data.available ? "Active" : "Unavailable"}
+                      {t("regionalWeather.status")}: {item.data.available ? t("regionalWeather.active") : t("regionalWeather.unavailable")}
                     </p>
                     {item.data.lastUpdated && (
                       <p className="text-xs text-muted-foreground">
-                        Updated:{" "}
+                        {t("regionalWeather.updated")}:{" "}
                         {new Date(item.data.lastUpdated).toLocaleTimeString()}
                       </p>
                     )}
@@ -151,21 +151,21 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
                   <>
                     <div className="flex items-center gap-2 mb-2">
                       <Waves className="h-5 w-5 text-blue-500" />
-                      <p className="text-sm font-medium">Coastal Conditions</p>
+                      <p className="text-sm font-medium">{t("regionalWeather.coastalConditions")}</p>
                     </div>
                     {item.data.waveHeight && (
                       <p className="text-lg font-medium mb-1">
-                        {item.data.waveHeight.toFixed(1)}m waves
+                        {item.data.waveHeight.toFixed(1)}m {t("regionalWeather.waves")}
                       </p>
                     )}
                     {item.data.surfConditions && (
                       <p className="text-xs text-muted-foreground capitalize">
-                        Surf: {item.data.surfConditions}
+                        {t("regionalWeather.surf")}: {item.data.surfConditions}
                       </p>
                     )}
                     {item.data.currentTide && (
                       <p className="text-xs text-muted-foreground">
-                        Tide: {item.data.currentTide}
+                        {t("regionalWeather.tide")}: {item.data.currentTide}
                       </p>
                     )}
                   </>
@@ -174,7 +174,7 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
             ))
           ) : (
             <div className="col-span-full text-center text-muted-foreground py-8">
-              No data available for {activeTab} tab
+              {t("regionalWeather.noData", { tab: activeTab })}
             </div>
           )}
         </div>
