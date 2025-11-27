@@ -16,6 +16,13 @@ const RadarOverlay = ({
   const { getTileUrl } = useRadar()
   const [timestamp, setTimestamp] = useState(new Date().toISOString())
   const [frame, setFrame] = useState<any>(null)
+
+  const frameRef = useRef<any>(null)
+
+  useEffect(() => {
+    frameRef.current = frame
+  }, [frame])
+
   const updateTilesLayer = ({
     coord,
     zoom,
@@ -60,7 +67,7 @@ const RadarOverlay = ({
     }
 
     // Build API URL through your proxy endpoint
-    const url = getTileUrl(frame, zoom, x, y)
+    const url = getTileUrl(frameRef.current, zoom, x, y)
 
     return url
   }
