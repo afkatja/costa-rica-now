@@ -1,4 +1,3 @@
-// app/api/weather/tiles/route.ts
 import { NextRequest } from "next/server"
 
 const TRANSPARENT_PNG = Buffer.from(
@@ -84,70 +83,66 @@ async function processRequestQueue() {
 
   while (requestQueue.length > 0) {
     const request = requestQueue.shift()!
+    const now = Date.now()
 
-    // Wait for all rate limits to clear
-    while (true) {
-      const now = Date.now()
+    // Clean old requests for proper limit checking
+    rateLimiter.requests = rateLimiter.requests.filter(t => now - t < 1000)
+    rateLimiter.hourlyRequests = rateLimiter.hourlyRequests.filter(
+      t => now - t < 3600000
+    )
+    rateLimiter.dailyRequests = rateLimiter.dailyRequests.filter(
+      t => now - t < 86400000
+    )
 
-      // Clean old requests for proper limit checking
-      rateLimiter.requests = rateLimiter.requests.filter(t => now - t < 1000)
-      rateLimiter.hourlyRequests = rateLimiter.hourlyRequests.filter(
-        t => now - t < 3600000
-      )
-      rateLimiter.dailyRequests = rateLimiter.dailyRequests.filter(
-        t => now - t < 86400000
-      )
+    const currentSecondRequests = rateLimiter.requests.filter(
+      t => now - t < 1000
+    ).length
+    const currentHourlyRequests = rateLimiter.hourlyRequests.length
+    const currentDailyRequests = rateLimiter.dailyRequests.length
 
-      const currentSecondRequests = rateLimiter.requests.filter(
-        t => now - t < 1000
-      ).length
-      const currentHourlyRequests = rateLimiter.hourlyRequests.length
-      const currentDailyRequests = rateLimiter.dailyRequests.length
+    // If we've hit hourly/daily limits, return cached or transparent tile immediately
+    if (currentHourlyRequests >= 25 || currentDailyRequests >= 500) {
+      console.warn(`Rate limit breached (${currentHourlyRequests}/25 hourly, ${currentDailyRequests}/500 daily) - returning fallback`)
+      
+      // Try to find cached tile first
+      const cacheKey = `${request.requestData.zoom}-${request.requestData.x}-${request.requestData.y}-${request.requestData.field}-${request.requestData.time}`
+      const cached = tileCache.get(cacheKey)
+      
+      const fallbackResponse = cached 
+        ? new Response(cached.data, {
+            headers: {
+              "Content-Type": "image/png",
+              "Cache-Control": "public, max-age=3600",
+              "X-Cache": "HIT-FALLBACK",
+              "X-Rate-Limited": "true"
+            }
+          })
+        : new Response(TRANSPARENT_PNG, {
+            headers: {
+              "Content-Type": "image/png",
+              "Cache-Control": "public, max-age=3600",
+              "X-Rate-Limited": "true"
+            }
+          })
+      
+      request.resolve(fallbackResponse)
+      continue
+    }
 
-      // Check if we can make a request
-      let canRequest = false
+    // Check if we can make a request (short burst control)
+    let canRequest = false
+    if (currentSecondRequests < 3) {
+      canRequest = true
+    } else if (now - rateLimiter.lastRequestTime >= 300) {
+      canRequest = true
+    }
 
-      // Allow burst of 3 requests per second, then space them out
-      if (currentSecondRequests < 3) {
-        canRequest = true
-      } else if (now - rateLimiter.lastRequestTime >= 300) {
-        canRequest = true
-      }
-
-      // Check hourly limit (24 requests remaining for the hour)
-      if (currentHourlyRequests >= 25) {
-        const timeUntilNextHour = 3600000 - (now % 3600000)
-        console.warn(
-          `Hourly limit reached (25/25). Waiting ${Math.round(
-            timeUntilNextHour / 1000
-          )}s for next hour`
-        )
-        await new Promise(resolve =>
-          setTimeout(resolve, Math.min(timeUntilNextHour, 60000))
-        ) // Wait at most 1 minute
-        continue
-      }
-
-      // Check daily limit (499 requests remaining for the day)
-      if (currentDailyRequests >= 500) {
-        const timeUntilNextDay = 86400000 - (now % 86400000)
-        console.warn(
-          `Daily limit reached (500/500). Waiting ${Math.round(
-            timeUntilNextDay / 1000
-          )}s for next day`
-        )
-        await new Promise(resolve =>
-          setTimeout(resolve, Math.min(timeUntilNextDay, 300000))
-        ) // Wait at most 5 minutes
-        continue
-      }
-
-      if (canRequest) {
-        break // We can proceed with the request
-      }
-
-      // Wait 100ms before checking again
+    if (!canRequest) {
+      // Only wait short periods for burst control (100-300ms max)
       await new Promise(resolve => setTimeout(resolve, 100))
+      // Re-queue this request to try again
+      requestQueue.unshift(request)
+      continue
     }
 
     try {
@@ -159,17 +154,8 @@ async function processRequestQueue() {
     }
 
     // Small delay between requests to avoid overwhelming the API
-    // Increase delay if we're approaching hourly/daily limits
     const status = getRateLimitStatus()
-    let delay = 200
-
-    if (status.perHour >= 20) {
-      delay = 500 // Slow down when approaching hourly limit
-    }
-    if (status.perDay >= 450) {
-      delay = 1000 // Very slow when approaching daily limit
-    }
-
+    const delay = status.perHour >= 20 ? 300 : 200
     await new Promise(resolve => setTimeout(resolve, delay))
   }
 
@@ -294,17 +280,32 @@ export async function GET(request: NextRequest) {
     // Check current rate limit status
     const status = getRateLimitStatus()
 
-    // If we've hit daily limit, return transparent tile immediately
-    if (status.perDay >= 500) {
-      console.warn("Daily limit reached (500/500) - returning transparent tile")
-      return new Response(TRANSPARENT_PNG, {
-        headers: {
-          "Content-Type": "image/png",
-          "Cache-Control": "public, max-age=3600",
-          "X-Rate-Limited": "true",
-          "X-Rate-Limit-Status": JSON.stringify(status),
-        },
-      })
+    // If we've hit hourly or daily limits, return cached or transparent tile immediately
+    if (status.perHour >= 25 || status.perDay >= 500) {
+      console.warn(`Rate limit reached (${status.perHour}/25 hourly, ${status.perDay}/500 daily) - returning fallback`)
+      
+      // Try to find cached tile first
+      const cacheKey = `${zoom}-${x}-${y}-${field}-${time}`
+      const cached = tileCache.get(cacheKey)
+      
+      return cached 
+        ? new Response(cached.data, {
+            headers: {
+              "Content-Type": "image/png",
+              "Cache-Control": "public, max-age=3600",
+              "X-Cache": "HIT-FALLBACK",
+              "X-Rate-Limited": "true",
+              "X-Rate-Limit-Status": JSON.stringify(status)
+            }
+          })
+        : new Response(TRANSPARENT_PNG, {
+            headers: {
+              "Content-Type": "image/png",
+              "Cache-Control": "public, max-age=3600",
+              "X-Rate-Limited": "true",
+              "X-Rate-Limit-Status": JSON.stringify(status)
+            }
+          })
     }
 
     // For immediate requests (first 3 per second), try to process directly
