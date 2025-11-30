@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server"
 import { kv } from "@vercel/kv"
+import { dayInMs, hourInMs } from "../../../../lib/utils"
 
 const TRANSPARENT_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
@@ -47,6 +48,16 @@ const rateLimiter = {
   hourlyRequests: [] as number[],
   dailyRequests: [] as number[],
   lastRequestTime: 0,
+}
+
+// Helper to prune rate limiter arrays based on time windows
+const pruneRateLimiter = (now: number) => {
+  const hourAgo = now - hourInMs
+  const dayAgo = now - dayInMs
+  rateLimiter.hourlyRequests = rateLimiter.hourlyRequests.filter(
+    t => t >= hourAgo
+  )
+  rateLimiter.dailyRequests = rateLimiter.dailyRequests.filter(t => t >= dayAgo)
 }
 
 // External store functions
@@ -98,6 +109,15 @@ async function getRateLimitCounters(): Promise<{
   lastRequestTime: number
 }> {
   if (!useExternalStore) {
+    const now = Date.now()
+    const hourAgo = now - hourInMs
+    const dayAgo = now - dayInMs
+    rateLimiter.hourlyRequests = rateLimiter.hourlyRequests.filter(
+      t => t >= hourAgo
+    )
+    rateLimiter.dailyRequests = rateLimiter.dailyRequests.filter(
+      t => t >= dayAgo
+    )
     return {
       hourlyRequests: rateLimiter.hourlyRequests.length,
       dailyRequests: rateLimiter.dailyRequests.length,
@@ -130,6 +150,7 @@ async function getRateLimitCounters(): Promise<{
 async function recordRateLimitRequest() {
   if (!useExternalStore) {
     const now = Date.now()
+    pruneRateLimiter(now)
     rateLimiter.requests.push(now)
     rateLimiter.hourlyRequests.push(now)
     rateLimiter.dailyRequests.push(now)
@@ -156,6 +177,7 @@ async function recordRateLimitRequest() {
     console.warn("Failed to record rate limit request in KV:", error)
     // Fallback to in-memory
     const now = Date.now()
+    pruneRateLimiter(now)
     rateLimiter.requests.push(now)
     rateLimiter.hourlyRequests.push(now)
     rateLimiter.dailyRequests.push(now)
@@ -184,6 +206,9 @@ async function canMakeRequest(): Promise<boolean> {
   // Clean old requests (in-memory for burst control)
   rateLimiter.requests = rateLimiter.requests.filter(t => now - t < 1000)
 
+  // Prune hourly and daily requests
+  pruneRateLimiter(now)
+
   // Allow burst of 3 requests, then stagger subsequent requests
   const currentSecondRequests = rateLimiter.requests.filter(
     t => now - t < 1000
@@ -210,6 +235,7 @@ async function canMakeRequest(): Promise<boolean> {
 
 function recordRequest() {
   const now = Date.now()
+  pruneRateLimiter(now)
   rateLimiter.requests.push(now)
   rateLimiter.hourlyRequests.push(now)
   rateLimiter.dailyRequests.push(now)
@@ -228,6 +254,9 @@ async function processRequestQueue() {
 
     // Clean old requests for proper limit checking (in-memory for burst)
     rateLimiter.requests = rateLimiter.requests.filter(t => now - t < 1000)
+
+    // Prune hourly and daily requests
+    pruneRateLimiter(now)
 
     const currentSecondRequests = rateLimiter.requests.filter(
       t => now - t < 1000

@@ -1,3 +1,4 @@
+import { dayInMs } from "../../../src/lib/utils"
 import calculateDistance from "../_shared/calculateDistance"
 
 Deno.serve(async req => {
@@ -294,7 +295,7 @@ function generateFallbackEvents(location = null, category = null) {
       category: "nature",
       location: "manuel-antonio",
       location_display: "Manuel Antonio",
-      date: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
+      date: new Date(Date.now() + dayInMs).toISOString(), // Tomorrow
       duration: "4 hours",
       price: "$45",
       rating: 4.8,
