@@ -41,7 +41,7 @@ export function formatRelativeTime(date: Date | string): string {
   return formatDate(d)
 }
 
-export const dayInMs = 86500000
+export const dayInMs = 86400000
 export const hourInMs = 3600000
 
 export function truncateText(text: string, maxLength: number): string {
