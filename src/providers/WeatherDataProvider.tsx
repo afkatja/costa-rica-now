@@ -152,7 +152,9 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
       )
 
       if (response.error) {
-        throw new Error(`Weather service error: ${response.error}`)
+        throw new Error(
+          `Weather service error: ${response.error.message ?? response.error}`
+        )
       }
 
       const result = response.data?.data
@@ -248,7 +250,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
             lastUpdated: beachData?.lastUpdated || null,
           } as TideData
         } catch (err) {
-          console.error(`Error fetching tides for ${locationKey}:`, err)
+          console.error(`Error fetching tides for ${locationKey.id}:`, err)
           return null
         }
       })

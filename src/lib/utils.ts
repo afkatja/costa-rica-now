@@ -41,6 +41,9 @@ export function formatRelativeTime(date: Date | string): string {
   return formatDate(d)
 }
 
+export const dayInMs = 86400000
+export const hourInMs = 3600000
+
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
   return text.substring(0, maxLength) + "..."
@@ -56,8 +59,11 @@ function isEnumMember({
   return Object.values(enumType).includes(value as unknown as typeof enumType)
 }
 
-export function stringToEnum<T extends Record<string, string>>(inputString: string, enumType: T): T[keyof T] | undefined {
-  if (isEnumMember({value: inputString, enumType})) {
+export function stringToEnum<T extends Record<string, string>>(
+  inputString: string,
+  enumType: T
+): T[keyof T] | undefined {
+  if (isEnumMember({ value: inputString, enumType })) {
     return inputString as T[keyof T]
   }
   return undefined

@@ -1,4 +1,3 @@
-// app/api/beach-conditions/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { coastalDestinations } from "@/lib/shared/destinations"
 
@@ -226,39 +225,45 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(conditions)
     }
+    // Process destinations in batches to avoid overwhelming external APIs
+    const BATCH_SIZE = 5
+    const allConditions: (BeachConditions | null)[] = []
 
-    // Fetch all destinations
-    const allConditions = await Promise.all(
-      coastalDestinations.map(async destination => {
-        try {
-          const [tideData, waveData] = await Promise.all([
-            fetchTides(destination.lat, destination.lon),
-            fetchWaves(destination.lat, destination.lon),
-          ])
+    for (let i = 0; i < coastalDestinations.length; i += BATCH_SIZE) {
+      const batch = coastalDestinations.slice(i, i + BATCH_SIZE)
+      const batchResults = await Promise.all(
+        batch.map(async destination => {
+          try {
+            const [tideData, waveData] = await Promise.all([
+              fetchTides(destination.lat, destination.lon),
+              fetchWaves(destination.lat, destination.lon),
+            ])
 
-          const tides = processTideData(tideData)
-          const waves = processWaveData(waveData)
+            const tides = processTideData(tideData)
+            const waves = processWaveData(waveData)
 
-          const conditions: BeachConditions = {
-            destinationId: destination.id,
-            destination: destination.name,
-            name: destination.name,
-            lat: destination.lat,
-            lon: destination.lon,
-            region: destination.region || "",
-            tides,
-            waves,
-            surfConditions: getSurfConditions(waves.current.height),
-            lastUpdated: new Date().toISOString(),
+            const conditions: BeachConditions = {
+              destinationId: destination.id,
+              destination: destination.name,
+              name: destination.name,
+              lat: destination.lat,
+              lon: destination.lon,
+              region: destination.region || "",
+              tides,
+              waves,
+              surfConditions: getSurfConditions(waves.current.height),
+              lastUpdated: new Date().toISOString(),
+            }
+
+            return conditions
+          } catch (error) {
+            console.error(`Error fetching data for ${destination.name}:`, error)
+            return null
           }
-
-          return conditions
-        } catch (error) {
-          console.error(`Error fetching data for ${destination.name}:`, error)
-          return null
-        }
-      })
-    )
+        })
+      )
+      allConditions.push(...batchResults)
+    }
 
     // Filter out any failed requests
     const validConditions = allConditions.filter(Boolean)

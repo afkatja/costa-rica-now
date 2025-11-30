@@ -122,7 +122,6 @@ const TidesInfoWindow = ({ beach }: { beach: BeachLocation }) => {
 
   const waveDir = getWaveDirection(data.waves.current.direction)
   const nextForecast = data.waves.forecast.slice(1, 4)
-  console.log({ data })
 
   return (
     <MapTooltipContent

@@ -7,15 +7,18 @@ interface RadarOverlayProps {
   field?: string // precipitationIntensity, temperature, etc.
 }
 
-const RadarOverlay = ({
-  opacity = 0.6,
-  field = "precipitationIntensity",
-}: RadarOverlayProps) => {
+const RadarOverlay = ({ opacity = 0.6 }: RadarOverlayProps) => {
   const map = useMap()
   const radarOverlayRef = useRef<google.maps.ImageMapType | null>(null)
   const { getTileUrl } = useRadar()
-  const [timestamp, setTimestamp] = useState(new Date().toISOString())
   const [frame, setFrame] = useState<any>(null)
+
+  const frameRef = useRef<any>(null)
+
+  useEffect(() => {
+    frameRef.current = frame
+  }, [frame])
+
   const updateTilesLayer = ({
     coord,
     zoom,
@@ -60,12 +63,12 @@ const RadarOverlay = ({
     }
 
     // Build API URL through your proxy endpoint
-    const url = getTileUrl(frame, zoom, x, y)
+    const url = getTileUrl(frameRef.current, tomorrowZoom, x, y)
 
     return url
   }
   useEffect(() => {
-    if (!map) return
+    if (!map || !radarOverlayRef.current) return
 
     // Remove existing radar overlay if present
     if (radarOverlayRef.current) {
@@ -105,14 +108,23 @@ const RadarOverlay = ({
         radarOverlayRef.current = null
       }
     }
-  }, [map, frame])
+  }, [map])
 
   // Listen for radar frame changes from the hook
   useEffect(() => {
     const handleRadarFrameChange = (event: CustomEvent) => {
       const { frame } = event.detail
       setFrame(frame)
-      setTimestamp(frame.time)
+
+      // Manually invalidate tiles by temporarily removing and re-inserting the overlay
+      if (map && radarOverlayRef.current) {
+        const overlays = map.overlayMapTypes
+        const index = overlays.getArray().indexOf(radarOverlayRef.current)
+        if (index !== -1) {
+          const overlay = overlays.removeAt(index)
+          overlays.insertAt(index, overlay)
+        }
+      }
     }
 
     window.addEventListener(
@@ -125,7 +137,7 @@ const RadarOverlay = ({
         handleRadarFrameChange as EventListener
       )
     }
-  }, [])
+  }, [map])
 
   return null
 }
