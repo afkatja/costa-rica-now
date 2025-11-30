@@ -273,7 +273,7 @@ async function processRequestQueue() {
 
       // Try to find cached tile first
       const cacheKey = `${request.requestData.zoom}-${request.requestData.x}-${request.requestData.y}-${request.requestData.field}-${request.requestData.time}`
-      const cached = tileCache.get(cacheKey)
+      const cached = await getCachedTile(cacheKey)
 
       const fallbackResponse = cached
         ? new Response(new Uint8Array(cached.data), {
@@ -450,7 +450,7 @@ export async function GET(request: NextRequest) {
 
       // Try to find cached tile first
       const cacheKey = `${zoom}-${x}-${y}-${field}-${time}`
-      const cached = tileCache.get(cacheKey)
+      const cached = await getCachedTile(cacheKey)
 
       return cached
         ? new Response(new Uint8Array(cached.data), {
