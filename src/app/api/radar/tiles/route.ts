@@ -339,7 +339,12 @@ async function fetchTile(requestData: {
 }): Promise<Response> {
   const apiKey = process.env.TOMORROW_API_KEY
   if (!apiKey) {
-    throw new Error("TOMORROW_API_KEY is not configured")
+    console.warn(
+      "TOMORROW_API_KEY is not configured - returning transparent tile"
+    )
+    return new Response(TRANSPARENT_PNG, {
+      headers: { "Content-Type": "image/png", "X-Radar-Disabled": "true" },
+    })
   }
   try {
     const cacheKey = `${requestData.zoom}-${requestData.x}-${requestData.y}-${requestData.field}-${requestData.time}`
