@@ -90,7 +90,7 @@ const Earthquakes = ({ earthquakes }: { earthquakes: Earthquake[] | null }) => {
               <AlertTriangle className="h-5 w-5 text-yellow-500" />
               <div>
                 <div className="text-2xl font-medium">
-                  {earthquakes.filter((e: any) => e.felt).length}
+                  {earthquakes.filter(e => e.felt).length}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   Sismos percibidos
@@ -108,7 +108,7 @@ const Earthquakes = ({ earthquakes }: { earthquakes: Earthquake[] | null }) => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {earthquakes.map((earthquake: any) => (
+            {earthquakes.map((earthquake: Earthquake) => (
               <div key={earthquake.id} className="border rounded-lg p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
