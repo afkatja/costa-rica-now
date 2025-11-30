@@ -75,4 +75,52 @@ const costaRicaDestinations = {
   },
 }
 
+type DestinationEntry = {
+  id: string
+  name: string
+  lat: number
+  lon: number
+  region?: string
+}
+
+const coastalDestinationKeys = [
+  "manuel-antonio",
+  "puerto-viejo",
+  "dominical",
+  "uvita",
+  "puerto-jimenez",
+  "tortuguero",
+  "samara",
+]
+
+export const coastalDestinations: DestinationEntry[] = [
+  ...(coastalDestinationKeys
+    .map(id => {
+      const entry = (costaRicaDestinations as any)[id]
+      if (!entry) return null
+      return {
+        id,
+        name: entry.name,
+        lat: entry.lat,
+        lon: entry.lon,
+        region: entry.region,
+      } as DestinationEntry
+    })
+    .filter(Boolean) as DestinationEntry[]),
+  {
+    id: "tamarindo",
+    name: "Tamarindo",
+    lat: 10.2999,
+    lon: -85.8412,
+    region: "Guanacaste",
+  },
+  {
+    id: "jaco",
+    name: "Jacó",
+    lat: 9.6216,
+    lon: -84.6286,
+    region: "Central Pacific Coast",
+  },
+]
+
 export default costaRicaDestinations

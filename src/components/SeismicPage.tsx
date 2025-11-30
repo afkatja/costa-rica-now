@@ -48,37 +48,38 @@ export function SeismicPage() {
     // if (geoError) setError(geoError)
   }, [position, geoLoading, geoError, requestLocation])
 
+  const fetchSeismicData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const response = await supabase.functions.invoke("seismic-service", {
+        body: {
+          startDate: new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000),
+          endDate: new Date(),
+          type: "earthquake",
+        },
+      })
+      console.log("SEISMIC DATA", { response })
+      setEarthquakes(response.data.events)
+    } catch (error) {
+      console.error("Error fetching seismic data", error)
+      setError(error instanceof Error ? error.message : "Unknown error")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Request location permission and fetch seismic data on mount
   useEffect(() => {
-    let cancelled = false
-    const fetchSeismicData = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-
-        const response = await supabase.functions.invoke("seismic-service", {
-          body: {
-            startDate: new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000),
-            endDate: new Date(),
-            type: "earthquake",
-          },
-        })
-        if (!cancelled) {
-          console.log("SEISMIC DATA", { response })
-          setEarthquakes(response.data.events)
-        }
-      } catch (error) {
-        console.error("Error fetching seismic data", error)
-        setError(error)
-      } finally {
-        setLoading(false)
-      }
+    if (!position && !geoLoading && !geoError) {
+      requestLocation()
     }
+    // if (geoError) setError(geoError)
+  }, [position, geoLoading, geoError, requestLocation])
 
+  useEffect(() => {
     fetchSeismicData()
-
-    return () => {
-      cancelled = true // Cleanup function
-    }
   }, [])
 
   return (

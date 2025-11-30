@@ -4,6 +4,7 @@ import { Viewport } from "next"
 import "./styles/globals.css"
 import { ClientLayout } from "../../components/ClientLayout"
 import { AuthProvider } from "../../providers/auth-provider"
+import { WeatherDataProvider } from "../../providers/WeatherDataProvider"
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -31,7 +32,9 @@ const Layout = async ({
       <body>
         <NextIntlClientProvider locale={locale}>
           <AuthProvider>
-            <ClientLayout>{children}</ClientLayout>
+            <WeatherDataProvider>
+              <ClientLayout>{children}</ClientLayout>
+            </WeatherDataProvider>
           </AuthProvider>
         </NextIntlClientProvider>
       </body>
