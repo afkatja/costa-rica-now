@@ -1,3 +1,4 @@
+import { dayInMs } from "../../../src/lib/utils"
 import calculateDistance from "../_shared/calculateDistance"
 
 Deno.serve(async req => {
@@ -294,7 +295,7 @@ function generateFallbackEvents(location = null, category = null) {
       category: "nature",
       location: "manuel-antonio",
       location_display: "Manuel Antonio",
-      date: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
+      date: new Date(Date.now() + dayInMs).toISOString(), // Tomorrow
       duration: "4 hours",
       price: "$45",
       rating: 4.8,
@@ -311,7 +312,7 @@ function generateFallbackEvents(location = null, category = null) {
       category: "adventure",
       location: "arenal",
       location_display: "Arenal",
-      date: new Date(Date.now() + 172800000).toISOString(), // Day after tomorrow
+      date: new Date(Date.now() + dayInMs * 2).toISOString(), // Day after tomorrow
       duration: "6 hours",
       price: "$65",
       rating: 4.9,
@@ -328,7 +329,7 @@ function generateFallbackEvents(location = null, category = null) {
       category: "cultural",
       location: "san-jose",
       location_display: "San José",
-      date: new Date(Date.now() + 259200000).toISOString(), // 3 days from now
+      date: new Date(Date.now() + dayInMs * 3).toISOString(), // 3 days from now
       duration: "3 hours",
       price: "$30",
       rating: 4.7,
@@ -345,7 +346,7 @@ function generateFallbackEvents(location = null, category = null) {
       category: "nature",
       location: "monteverde",
       location_display: "Monteverde",
-      date: new Date(Date.now() + 345600000).toISOString(), // 4 days from now
+      date: new Date(Date.now() + dayInMs * 4).toISOString(), // 4 days from now
       duration: "2.5 hours",
       price: "$35",
       rating: 4.6,
@@ -362,7 +363,7 @@ function generateFallbackEvents(location = null, category = null) {
       category: "food",
       location: "san-jose",
       location_display: "San José",
-      date: new Date(Date.now() + 432000000).toISOString(), // 5 days from now
+      date: new Date(Date.now() + dayInMs * 5).toISOString(), // 5 days from now
       duration: "4 hours",
       price: "$55",
       rating: 4.9,

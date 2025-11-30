@@ -44,6 +44,18 @@
       "warm": "25-29°C",
       "mild": "20-24°C",
       "cool": "<20°C"
+    },
+    "regionalWeather": {
+      "precipitation": "Precipitación",
+      "status": "Estado",
+      "active": "Activo",
+      "unavailable": "No disponible",
+      "updated": "Actualizado",
+      "coastalConditions": "Condiciones Costeras",
+      "waves": "olas",
+      "surf": "Surf",
+      "tide": "Marea",
+      "noData": "No hay datos disponibles para la pestaña {tab}"
     }
   }
 }

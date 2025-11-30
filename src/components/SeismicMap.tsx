@@ -1,6 +1,5 @@
 "use client"
 import { useState } from "react"
-import { CostaRicaMap, coordsToSVG } from "./CostaRicaMap"
 import { MapTooltip } from "./MapTooltip"
 import { mockSeismicData } from "../utils/mockSeismicData"
 import { Activity, Mountain, Clock, AlertTriangle } from "lucide-react"
@@ -8,6 +7,7 @@ import { Badge } from "./ui/badge"
 import { useGeolocation } from "../hooks/use-geolocation"
 import { baseColorScheme, ColorSet } from "./Marker"
 import MapTooltipContent from "./MapTooltipContent"
+import GoogleMapsWrapper from "./GoogleMapsWrapper"
 
 type PinType = "earthquake" | "volcano"
 
@@ -157,7 +157,7 @@ export function SeismicMap({ locations }: { locations: any[] | null }) {
         </div>
       )}
 
-      <CostaRicaMap destinations={pins} />
+      <GoogleMapsWrapper destinations={pins} />
 
       <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
         <div>

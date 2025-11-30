@@ -5,8 +5,13 @@ import Supercluster from "supercluster"
 import Marker, { baseColorScheme } from "./Marker"
 import { useMap, Map, AdvancedMarker } from "@vis.gl/react-google-maps"
 import { MapTooltip } from "./MapTooltip"
+import { CR_COORDS } from "../hooks/use-radar"
 
-const MapComponent = ({ destinations }: { destinations: any[] }) => {
+interface BaseMapProps {
+  destinations: any[]
+}
+
+const BaseMap = ({ destinations }: BaseMapProps) => {
   const superclusterRef = useRef<Supercluster | null>(null)
 
   const [bounds, setBounds] = useState<
@@ -93,16 +98,18 @@ const MapComponent = ({ destinations }: { destinations: any[] }) => {
     map?.setCenter({ lat: latitude, lng: longitude })
     map?.setZoom(expansionZoom ?? zoom)
   }
+
   const handleMarkerClick = (marker: any, destination: any) => {
     setInfoVisible(destination.id || destination.name || null)
     setMarkerAnchor(marker)
     setInfoContent({ header: destination.name, body: destination.content })
   }
+
   return (
     <Map
       mapId={process.env.NEXT_PUBLIC_GMAPS_MAP_ID as string}
       style={{ width: "100%", height: "100%" }}
-      defaultCenter={{ lat: 9.9092, lng: -83.7417 }}
+      defaultCenter={CR_COORDS}
       defaultZoom={zoom}
     >
       {clusters.map(cluster => {
@@ -147,4 +154,4 @@ const MapComponent = ({ destinations }: { destinations: any[] }) => {
   )
 }
 
-export default MapComponent
+export default BaseMap
