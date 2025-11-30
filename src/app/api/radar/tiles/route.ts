@@ -84,11 +84,9 @@ async function setCachedTile(
       data: data.toString("base64"),
       timestamp,
     })
-    await kvClient!.setex(
-      `tile:${cacheKey}`,
-      Math.floor(CACHE_DURATION / 1000),
-      value
-    )
+    await kvClient!.set(`tile:${cacheKey}`, value, {
+      ex: Math.floor(CACHE_DURATION / 1000),
+    })
   } catch (error) {
     console.warn("Failed to set cached tile in KV:", error)
   }
