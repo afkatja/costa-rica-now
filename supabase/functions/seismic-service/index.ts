@@ -1,3 +1,4 @@
+import { COSTA_RICA_BOUNDS } from "../_shared/coords.ts"
 import { corsHeaders } from "../_shared/cors.ts"
 import cheerio from "https://esm.sh/cheerio@1.0.0-rc.12"
 
@@ -19,14 +20,6 @@ const normalizeOvsicori = (quake: any) => ({
   status: quake.Autor || "unknown",
   url: quake.url,
 })
-
-// Costa Rica bounding box coordinates
-const COSTA_RICA_BOUNDS = {
-  minLatitude: 8.0,
-  maxLatitude: 11.5,
-  minLongitude: -86.0,
-  maxLongitude: -82.5,
-}
 
 // Unified event structure
 interface SeismicEvent {
@@ -50,6 +43,8 @@ interface FetchParams {
   endDate: string
   minMagnitude?: number
   maxMagnitude?: number
+  limit?: number
+  offset?: number
 }
 
 // Fetch USGS data
@@ -169,7 +164,6 @@ async function fetchRSNData(params: FetchParams): Promise<SeismicEvent[]> {
   const { startDate, endDate, minMagnitude = 2.5, maxMagnitude } = params
 
   const queryParams = new URLSearchParams({
-    format: "geojson",
     starttime: startDate,
     endtime: endDate,
     minlatitude: COSTA_RICA_BOUNDS.minLatitude.toString(),
@@ -183,36 +177,55 @@ async function fetchRSNData(params: FetchParams): Promise<SeismicEvent[]> {
     queryParams.append("maxmagnitude", maxMagnitude.toString())
   }
 
-  // IRIS provides access to RSN (TC network) data
-  const url = `http://service.iris.edu/fdsnws/event/1/query?${queryParams.toString()}&network=TC`
+  const url = `http://www.isc.ac.uk/fdsnws/event/1/query?${queryParams.toString()}`
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Supabase-Edge-Function/1.0",
+      },
+    })
 
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "Supabase-Edge-Function/1.0",
-    },
-  })
+    console.log("RSN response", response)
 
-  if (!response.ok) {
-    throw new Error(`RSN API error: ${response.status} ${response.statusText}`)
+    if (!response.ok) {
+      throw new Error(
+        `RSN API error: ${response.status} ${response.statusText}`
+      )
+    }
+
+    const data = await response.json()
+
+    return data.features
+      .filter((feature: any) => {
+        // Check if the event is from RSN/UCR/TC network
+        const contributor =
+          feature.properties?.net || feature.properties?.contributor
+        return (
+          contributor === "tc" ||
+          contributor === "TC" ||
+          contributor?.toLowerCase().includes("rsn") ||
+          contributor?.toLowerCase().includes("ucr")
+        )
+      })
+      .map((feature: any) => ({
+        id: `rsn-${feature.id}`,
+        source: "rsn" as const,
+        magnitude: feature.properties.mag,
+        location: feature.properties.place,
+        lat: feature.geometry.coordinates[1],
+        lon: feature.geometry.coordinates[0],
+        depth: feature.geometry.coordinates[2],
+        time: feature.properties.time,
+        felt: feature.properties.felt,
+        intensity: feature.properties.cdi,
+        tsunami: feature.properties.tsunami === 1,
+        url: feature.properties.url,
+        status: feature.properties.status,
+      }))
+  } catch (error) {
+    console.error("RSN fetch error:", error)
+    return []
   }
-
-  const data = await response.json()
-
-  return data.features.map((feature: any) => ({
-    id: `rsn-${feature.id}`,
-    source: "rsn" as const,
-    magnitude: feature.properties.mag,
-    location: feature.properties.place,
-    lat: feature.geometry.coordinates[1],
-    lon: feature.geometry.coordinates[0],
-    depth: feature.geometry.coordinates[2],
-    time: feature.properties.time,
-    felt: feature.properties.felt,
-    intensity: feature.properties.cdi,
-    tsunami: feature.properties.tsunami === 1,
-    url: feature.properties.url,
-    status: feature.properties.status,
-  }))
 }
 
 // Deduplicate events based on proximity, time, and magnitude
@@ -300,9 +313,10 @@ Deno.serve(async req => {
     }
 
     // Fetch from all available sources in parallel
-    const [usgsEvents, ovsicoriEvents] = await Promise.allSettled([
+    const [usgsEvents, ovsicoriEvents, rsnEvents] = await Promise.allSettled([
       fetchUSGSData(params),
       fetchOVSICORIData(params),
+      fetchRSNData(params),
     ])
 
     const allEvents: SeismicEvent[] = []
@@ -319,6 +333,12 @@ Deno.serve(async req => {
       allEvents.push(...ovsicoriEvents.value)
     } else {
       console.error("OVSICORI fetch failed:", ovsicoriEvents.reason)
+    }
+    // Collect RSN events
+    if (rsnEvents.status === "fulfilled") {
+      allEvents.push(...rsnEvents.value)
+    } else {
+      console.error("RSN fetch failed:", rsnEvents.reason)
     }
 
     // Filter events by requested date range (if provided) to avoid returning
@@ -348,12 +368,20 @@ Deno.serve(async req => {
     const uniqueEvents = deduplicateEvents(filteredEvents)
     const sortedEvents = sortEvents(uniqueEvents)
 
-    // Calculate statistics
+    // Apply pagination if requested
+    const limit = params.limit || sortedEvents.length
+    const offset = params.offset || 0
+    const paginatedEvents = sortedEvents.slice(offset, offset + limit)
+
+    console.log({ paginatedEvents })
+
+    // Calculate statistics (on full dataset)
     const stats = {
       total: sortedEvents.length,
       sources: {
         usgs: sortedEvents.filter(e => e.source === "usgs").length,
         ovsicori: sortedEvents.filter(e => e.source === "ovsicori").length,
+        rsn: sortedEvents.filter(e => e.source === "rsn").length,
         manual: sortedEvents.filter(e => e.source === "manual").length,
       },
       magnitudeRange:
@@ -372,8 +400,7 @@ Deno.serve(async req => {
     return new Response(
       JSON.stringify({
         success: true,
-        allEvents,
-        events: sortedEvents,
+        events: paginatedEvents,
         metadata: {
           type,
           requestedAt: new Date().toISOString(),
@@ -382,11 +409,18 @@ Deno.serve(async req => {
             start: params.startDate,
             end: params.endDate,
           },
+          pagination: {
+            total: sortedEvents.length,
+            limit,
+            offset,
+            hasMore: offset + limit < sortedEvents.length,
+          },
           stats,
           sources: {
             usgs: usgsEvents.status === "fulfilled" ? "success" : "failed",
             ovsicori:
-              ovsicoriEvents.status === "fulfilled" ? "partial" : "failed", // partial until parser is implemented
+              ovsicoriEvents.status === "fulfilled" ? "partial" : "failed",
+            rsn: rsnEvents.status === "fulfilled" ? "success" : "failed",
           },
           notes: [
             "USGS includes earthquakes M2.5+ in Costa Rica region",

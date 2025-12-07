@@ -1,7 +1,15 @@
-import React from "react"
+import React, { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "./ui/pagination"
 
 import {
   Activity,
@@ -25,7 +33,23 @@ type Earthquake = {
   depth: number
 }
 
-const Earthquakes = ({ earthquakes }: { earthquakes: Earthquake[] | null }) => {
+interface EarthquakesProps {
+  earthquakes: Earthquake[] | null
+  totalCount: number
+  stats: any
+  currentPage: number
+  itemsPerPage: number
+  onPageChange: (page: number) => void
+}
+
+const Earthquakes = ({
+  earthquakes,
+  totalCount,
+  stats,
+  currentPage,
+  itemsPerPage,
+  onPageChange,
+}: EarthquakesProps) => {
   const getMagnitudeColor = (magnitude: number) => {
     if (magnitude >= 6) return "text-red-600"
     if (magnitude >= 4.5) return "text-orange-500"
@@ -39,10 +63,7 @@ const Earthquakes = ({ earthquakes }: { earthquakes: Earthquake[] | null }) => {
     return "outline"
   }
 
-  const maxMagnitude =
-    earthquakes && earthquakes.length
-      ? Math.max(...earthquakes.map(e => e.magnitude))
-      : null
+  const maxMagnitude = stats?.magnitudeRange?.max || null
 
   if (!earthquakes)
     return (
@@ -50,6 +71,8 @@ const Earthquakes = ({ earthquakes }: { earthquakes: Earthquake[] | null }) => {
         No data
       </TabsContent>
     )
+
+  const totalPages = Math.ceil(totalCount / itemsPerPage)
   return (
     <>
       {/* Earthquakes Summary */}
@@ -59,7 +82,7 @@ const Earthquakes = ({ earthquakes }: { earthquakes: Earthquake[] | null }) => {
             <div className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-blue-500" />
               <div>
-                <div className="text-2xl font-medium">{earthquakes.length}</div>
+                <div className="text-2xl font-medium">{totalCount}</div>
                 <div className="text-sm text-muted-foreground">
                   Sismos últimos 7 días
                 </div>
@@ -90,7 +113,7 @@ const Earthquakes = ({ earthquakes }: { earthquakes: Earthquake[] | null }) => {
               <AlertTriangle className="h-5 w-5 text-yellow-500" />
               <div>
                 <div className="text-2xl font-medium">
-                  {earthquakes.filter(e => e.felt).length}
+                  {stats?.feltCount || 0}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   Sismos percibidos
@@ -108,7 +131,7 @@ const Earthquakes = ({ earthquakes }: { earthquakes: Earthquake[] | null }) => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {earthquakes.map((earthquake: Earthquake) => (
+            {earthquakes?.map((earthquake: Earthquake) => (
               <div key={earthquake.id} className="border rounded-lg p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -137,7 +160,7 @@ const Earthquakes = ({ earthquakes }: { earthquakes: Earthquake[] | null }) => {
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
-                    {formatDateTime(earthquake.time)}
+                    {formatDateTime(earthquake.time as string)}
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Profundidad: {earthquake.depth} km
@@ -148,6 +171,46 @@ const Earthquakes = ({ earthquakes }: { earthquakes: Earthquake[] | null }) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-center mt-4">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+                  className={
+                    currentPage === 1 ? "pointer-events-none opacity-50" : ""
+                  }
+                />
+              </PaginationItem>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    onClick={() => onPageChange(page)}
+                    isActive={currentPage === page}
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() =>
+                    onPageChange(Math.min(totalPages, currentPage + 1))
+                  }
+                  className={
+                    currentPage === totalPages
+                      ? "pointer-events-none opacity-50"
+                      : ""
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </>
   )
 }
