@@ -57,5 +57,43 @@
       "tide": "Marea",
       "noData": "No hay datos disponibles para la pestaña {tab}"
     }
+  },
+  "SeismicPage": {
+    "title": "Actividad Sísmica y Volcánica",
+    "mapTitle": "Mapa de Actividad Sísmica y Volcánica",
+    "loading": "Cargando datos sísmicos...",
+    "error": "Error al cargar datos sísmicos",
+    "retry": "Reintentar",
+    "recentEarthquakes": "Sismos Recientes",
+    "volcanicActivity": "Actividad Volcánica",
+    "seismicData": "Datos Sísmicos y Volcánicos",
+    "seismicDataDescription": "Conecte con USGS APIs para datos en tiempo real de terremotos, actividad volcánica y alertas sísmicas.",
+    "usgsEarthquakeApi": "USGS Earthquake API",
+    "usgsVolcanoApi": "USGS Volcano API",
+    "realTimeAlerts": "Alertas en tiempo real",
+    "interactiveMaps": "Mapas interactivos"
+  },
+  "SeismicMap": {
+    "noData": "Sin datos",
+    "locationIndicator": "Mostrando actividad sísmica dentro de 100km de su ubicación",
+    "earthquakesByMagnitude": "Sismos por Magnitud",
+    "magnitude6": "M 6.0+",
+    "magnitude4": "M 4.5-5.1",
+    "magnitude5": "M 5.1-5.9",
+    "magnitude3": "M 3.0-4.4",
+    "magnitudeLess3": "M <3.0",
+    "volcanoesByAlert": "Volcanes por Alerta",
+    "redAlert": "Alerta Roja",
+    "orangeAlert": "Alerta Naranja",
+    "yellowAlert": "Alerta Amarilla",
+    "greenAlert": "Alerta Verde",
+    "magnitude": "M",
+    "feels": "Se sintió",
+    "depth": "Profundidad",
+    "km": "km",
+    "alert": "Alerta",
+    "temperature": "Temp",
+    "celsius": "°C",
+    "lastEruption": "Última erupción"
   }
 }

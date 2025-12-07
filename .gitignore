@@ -14,3 +14,5 @@ supabase/.temp/cli-latest
 certificates
 tsconfig.tsbuildinfo
 supabase/.temp
+.vercel
+.env*.local
