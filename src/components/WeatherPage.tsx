@@ -112,9 +112,14 @@ export function WeatherPage() {
   // Use Weather Data Provider
   const {
     weatherData: allWeatherData,
+    radarData: allRadarData,
+    tidesData: allTidesData,
     loading: providerLoading,
     errors: providerErrors,
     refreshWeather,
+    refreshRadar,
+    refreshTides,
+    fetchWeatherForLocation,
   } = useWeatherData()
 
   const {
@@ -125,52 +130,53 @@ export function WeatherPage() {
     isInCostaRica,
   } = useGeolocation()
 
+  const findClosestLocation = (position: {
+    latitude: number
+    longitude: number
+  }) => {
+    const locations = Object.entries(costaRicaDestinations)
+    const closest = locations.reduce((prev, [currKey, currDest]) => {
+      const prevDest =
+        costaRicaDestinations[prev[0] as keyof typeof costaRicaDestinations]
+      if (!prevDest) return [currKey, currDest]
+
+      const prevDist = Math.sqrt(
+        Math.pow(prevDest.lat - position.latitude, 2) +
+          Math.pow(prevDest.lon - position.longitude, 2)
+      )
+      const currDist = Math.sqrt(
+        Math.pow(currDest.lat - position.latitude, 2) +
+          Math.pow(currDest.lon - position.longitude, 2)
+      )
+
+      return currDist < prevDist ? [currKey, currDest] : prev
+    }, locations[0])
+
+    return closest[0] as string
+  }
+
   // Find user's weather data for location name
   useEffect(() => {
     if (allWeatherData && allWeatherData.length > 0) {
-      let userWeather = allWeatherData.find(
-        (w: any) => w.location === "san-jose" // Default
-      )
-
       // If user is in Costa Rica, use their closest location
       if (position && isInCostaRica) {
-        const closest = allWeatherData.reduce((prev: any, curr: any) => {
-          const prevDest =
-            costaRicaDestinations[
-              prev.location as keyof typeof costaRicaDestinations
-            ]
-          const currDest =
-            costaRicaDestinations[
-              curr.location as keyof typeof costaRicaDestinations
-            ]
-
-          if (!prevDest || !currDest) return prev
-
-          const prevDist = Math.sqrt(
-            Math.pow(prevDest.lat - position.latitude, 2) +
-              Math.pow(prevDest.lon - position.longitude, 2)
-          )
-          const currDist = Math.sqrt(
-            Math.pow(currDest.lat - position.latitude, 2) +
-              Math.pow(currDest.lon - position.longitude, 2)
-          )
-
-          return currDist < prevDist ? curr : prev
-        })
-
-        userWeather = closest
-        setLocationName(closest.name)
+        setLocationName(findClosestLocation(position))
       } else {
         setLocationName("San José")
       }
 
-      // Find forecast data for user location
-      if (userWeather && allWeatherData.length > 0) {
-        // For now, use the same data structure - would need forecast data from provider
-        setForecastData(null)
-      }
+      // // Find forecast data for user location
+      // if (userWeather && allWeatherData.length > 0) {
+      //   // For now, use the same data structure - would need forecast data from provider
+      //   setForecastData(null)
+      // }
+    } else if (position && isInCostaRica) {
+      // If we have user location but no weather data yet, fetch the closest location
+
+      const closestLocation = findClosestLocation(position)
+      fetchWeatherForLocation(closestLocation)
     }
-  }, [allWeatherData, position, isInCostaRica])
+  }, [allWeatherData, position, isInCostaRica, fetchWeatherForLocation])
 
   // Request location permission on mount
   useEffect(() => {
@@ -178,6 +184,50 @@ export function WeatherPage() {
       requestLocation()
     }
   }, [position, geoLoading, geoError, requestLocation])
+
+  // Fetch user location weather data initially
+  useEffect(() => {
+    if (
+      !allWeatherData.length &&
+      !providerLoading.weather &&
+      !providerErrors.weather
+    ) {
+      // Fetch default location (San José) initially
+      fetchWeatherForLocation("san-jose")
+    }
+  }, [allWeatherData.length, fetchWeatherForLocation])
+
+  // Fetch tab-specific data when tab changes
+  useEffect(() => {
+    const fetchTabData = async () => {
+      switch (activeTab) {
+        case TabOfRegional.Radar:
+          if (!allRadarData.length && !providerLoading.radar) {
+            await refreshRadar()
+          }
+          break
+        case TabOfRegional.TidesAndWaves:
+          if (!allTidesData.length && !providerLoading.tides) {
+            await refreshTides()
+          }
+          break
+        case TabOfRegional.Weather:
+        default:
+          // Weather data for all regions is fetched when weather tab is activated
+          if (
+            !allWeatherData.length &&
+            !providerLoading.weather &&
+            !providerErrors.weather
+          ) {
+            await refreshWeather()
+          }
+          break
+      }
+    }
+    console.log({ activeTab, allWeatherData })
+
+    fetchTabData()
+  }, [activeTab, refreshRadar, refreshTides, refreshWeather])
 
   return (
     <div className="space-y-6">
@@ -199,11 +249,10 @@ export function WeatherPage() {
       {/* Current Weather */}
       <WeatherCurrent
         weatherData={
-          allWeatherData?.find(
-            (w: any) =>
-              w.location ===
-              (position && isInCostaRica ? "closest" : "san-jose")
-          ) || allWeatherData?.[0]
+          position && isInCostaRica
+            ? findClosestLocation(position)
+            : allWeatherData?.find((w: any) => w.location === "san-jose") ||
+              allWeatherData?.[0]
         }
         weatherLoading={providerLoading.weather}
         weatherError={providerErrors.weather}

@@ -74,9 +74,10 @@ interface WeatherDataContextType {
     tides: string | null
   }
   // fetchAllData: () => Promise<void>
-  refreshWeather: () => Promise<void>
+  refreshWeather: (locations?: string[]) => Promise<void>
   refreshRadar: () => Promise<void>
   refreshTides: () => Promise<void>
+  fetchWeatherForLocation: (location: string) => Promise<void>
 }
 
 const WeatherDataContext = createContext<WeatherDataContextType | null>(null)
@@ -133,19 +134,19 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
     return Array.from(regionMap.values())
   }
 
-  // Fetch weather data for all regions
-  const refreshWeather = async () => {
+  // Fetch weather data for specific locations
+  const refreshWeather = async (locations?: string[]) => {
     try {
       setLoading(prev => ({ ...prev, weather: true }))
       setErrors(prev => ({ ...prev, weather: null }))
 
-      const allLocationKeys = Object.keys(costaRicaDestinations)
+      const locationKeys = locations || Object.keys(costaRicaDestinations)
 
       const response = await supabase.functions.invoke(
         "weather-service-enhanced",
         {
           body: {
-            locations: allLocationKeys,
+            locations: locationKeys,
             types: ["current"],
           },
         }
@@ -162,7 +163,27 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
         const currentWeather = result.weather.filter(
           (w: any) => w.type === "current"
         )
-        setWeatherData(currentWeather)
+        setWeatherData(prevData => {
+          // Merge new data with existing data to avoid losing other locations
+          const newWeatherMap = new Map<string, WeatherData>()
+          currentWeather.forEach((w: WeatherData) => {
+            newWeatherMap.set(w.location, w)
+          })
+
+          const existingWeatherMap = new Map<string, WeatherData>()
+          prevData.forEach(w => {
+            existingWeatherMap.set(w.location, w)
+          })
+
+          return Array.from(newWeatherMap.entries()).map(
+            ([location, weather]) => {
+              const existingWeather = existingWeatherMap.get(location)
+              return existingWeather
+                ? { ...existingWeather, ...weather }
+                : weather
+            }
+          )
+        })
       }
     } catch (err) {
       console.error("Error fetching weather data:", err)
@@ -174,6 +195,11 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
     } finally {
       setLoading(prev => ({ ...prev, weather: false }))
     }
+  }
+
+  // Fetch weather data for a specific location
+  const fetchWeatherForLocation = async (location: string) => {
+    await refreshWeather([location])
   }
 
   // Fetch radar data for all regions (simulated based on available radar data)
@@ -291,6 +317,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
     refreshWeather,
     refreshRadar,
     refreshTides,
+    fetchWeatherForLocation,
   }
 
   return (
