@@ -20,21 +20,11 @@ import {
   Thermometer,
   TrendingUp,
 } from "lucide-react"
-import { formatDateTime } from "./SeismicPage"
-
-type Earthquake = {
-  id: string
-  magnitude: number
-  felt: boolean
-  intensity: string
-  reports: number
-  location: string
-  time: string | number | Date
-  depth: number
-}
+import { useTranslations } from "next-intl"
+import { SeismicEvent } from "../types/seismic"
 
 interface EarthquakesProps {
-  earthquakes: Earthquake[] | null
+  earthquakes: SeismicEvent[] | null
   totalCount: number
   stats: any
   currentPage: number
@@ -50,6 +40,7 @@ const Earthquakes = ({
   itemsPerPage,
   onPageChange,
 }: EarthquakesProps) => {
+  const t = useTranslations("Earthquakes")
   const getMagnitudeColor = (magnitude: number) => {
     if (magnitude >= 6) return "text-red-600"
     if (magnitude >= 4.5) return "text-orange-500"
@@ -68,7 +59,7 @@ const Earthquakes = ({
   if (!earthquakes)
     return (
       <TabsContent value="earthquakes" className="space-y-y">
-        No data
+        {t("noData")}
       </TabsContent>
     )
 
@@ -84,7 +75,7 @@ const Earthquakes = ({
               <div>
                 <div className="text-2xl font-medium">{totalCount}</div>
                 <div className="text-sm text-muted-foreground">
-                  Sismos últimos 7 días
+                  {t("earthquakesLast7Days")}
                 </div>
               </div>
             </div>
@@ -97,10 +88,10 @@ const Earthquakes = ({
               <TrendingUp className="h-5 w-5 text-orange-500" />
               <div>
                 <div className="text-2xl font-medium">
-                  {maxMagnitude ? `M ${maxMagnitude}` : "N/A"}
+                  {maxMagnitude ? `M ${maxMagnitude}` : t("na")}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  Magnitud máxima
+                  {t("maximumMagnitude")}
                 </div>
               </div>
             </div>
@@ -115,9 +106,7 @@ const Earthquakes = ({
                 <div className="text-2xl font-medium">
                   {stats?.feltCount || 0}
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  Sismos percibidos
-                </div>
+                <div className="text-sm text-muted-foreground">{t("felt")}</div>
               </div>
             </div>
           </CardContent>
@@ -127,11 +116,11 @@ const Earthquakes = ({
       {/* Recent Earthquakes */}
       <Card>
         <CardHeader>
-          <CardTitle>Sismos Recientes</CardTitle>
+          <CardTitle>{t("recentEarthquakes")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {earthquakes?.map((earthquake: Earthquake) => (
+            {earthquakes?.map((earthquake: SeismicEvent) => (
               <div key={earthquake.id} className="border rounded-lg p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -141,16 +130,25 @@ const Earthquakes = ({
                     >
                       M {earthquake.magnitude}
                     </Badge>
-                    <span className="font-medium">{earthquake.intensity}</span>
-                    {earthquake.felt && (
+                    <span className="font-medium">{earthquake.source}</span>
+                    {earthquake.felt && earthquake.felt > 0 && (
                       <Badge variant="outline" className="text-xs">
-                        Percibido
+                        {t("felt")}
                       </Badge>
                     )}
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    {earthquake.reports} reportes
-                  </div>
+                  {earthquake.url && (
+                    <div className="text-sm text-muted-foreground">
+                      <a
+                        href={earthquake.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        {t("source")}
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -160,11 +158,19 @@ const Earthquakes = ({
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
-                    {formatDateTime(earthquake.time as string)}
+                    {earthquake.formattedDateTime ||
+                      earthquake.formattedTime ||
+                      new Date(earthquake.time).toLocaleString("es-CR")}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Profundidad: {earthquake.depth} km
+                    {t("depth")}:{" "}
+                    {earthquake.depth ? `${earthquake.depth} km` : t("unknown")}
                   </div>
+                  {earthquake.status && (
+                    <div className="text-sm text-muted-foreground">
+                      {t("status")}: {earthquake.status}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

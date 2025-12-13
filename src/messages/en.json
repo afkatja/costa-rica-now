@@ -95,5 +95,18 @@
     "temperature": "Temp",
     "celsius": "°C",
     "lastEruption": "Last eruption"
+  },
+  "Earthquakes": {
+    "noData": "No data",
+    "earthquakesLast7Days": "Earthquakes last 7 days",
+    "maximumMagnitude": "Maximum magnitude",
+    "feltEarthquakes": "Felt earthquakes",
+    "recentEarthquakes": "Recent Earthquakes",
+    "felt": "Felt",
+    "reports": "reports",
+    "depth": "Depth",
+    "km": "km",
+    "magnitude": "M",
+    "na": "N/A"
   }
 }
