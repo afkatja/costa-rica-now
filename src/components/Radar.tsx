@@ -6,7 +6,10 @@ import costaRicaDestinations from "../lib/shared/destinations"
 import GoogleMapsWrapper from "./GoogleMapsWrapper"
 import RadarLegend from "./RadarLegend"
 
+const isRadarEnabled = process.env.NEXT_PUBLIC_FEATURE_RADAR_ENABLED === "true"
+
 const Radar = () => {
+  if (!isRadarEnabled) return null
   const [radarOpacity, setRadarOpacity] = useState(0.6)
 
   const {

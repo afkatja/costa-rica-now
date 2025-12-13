@@ -7,6 +7,8 @@ import costaRicaDestinations from "../lib/shared/destinations"
 import { useWeatherData } from "../providers/WeatherDataProvider"
 import { CloudRain, Droplets, Waves } from "lucide-react"
 
+const isRadarEnabled = process.env.NEXT_PUBLIC_FEATURE_RADAR_ENABLED === "true"
+
 export enum TabOfRegional {
   Weather = "weather",
   Radar = "radar",
@@ -57,6 +59,7 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
           .filter(Boolean)
 
       case TabOfRegional.Radar:
+        if (!isRadarEnabled) return []
         return radarData
           .filter((radar: any) => radar.available)
           .map((radar: any) => ({
@@ -88,6 +91,7 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
       case TabOfRegional.Weather:
         return t("currentConditions")
       case TabOfRegional.Radar:
+        if (!isRadarEnabled) return t("currentConditions")
         return t("RegionalWeather.precipitation")
       case TabOfRegional.TidesAndWaves:
         return t("RegionalWeather.coastalConditions")

@@ -103,6 +103,8 @@ const getDestinations = (weatherData: WeatherData[] | null) => {
   return destinations
 }
 
+const isRadarEnabled = process.env.NEXT_PUBLIC_FEATURE_RADAR_ENABLED === "true"
+
 export function WeatherPage() {
   const t = useTranslations("WeatherPage")
   const [activeTab, setActiveTab] = useState(TabOfRegional.Weather)
@@ -185,6 +187,13 @@ export function WeatherPage() {
     }
   }, [position, geoLoading, geoError, requestLocation])
 
+  // Handle feature flag changes - switch to weather if radar is disabled and active
+  useEffect(() => {
+    if (!isRadarEnabled && activeTab === TabOfRegional.Radar) {
+      setActiveTab(TabOfRegional.Weather)
+    }
+  }, [isRadarEnabled, activeTab])
+
   // Fetch user location weather data initially
   useEffect(() => {
     if (
@@ -202,7 +211,11 @@ export function WeatherPage() {
     const fetchTabData = async () => {
       switch (activeTab) {
         case TabOfRegional.Radar:
-          if (!allRadarData.length && !providerLoading.radar) {
+          if (
+            isRadarEnabled &&
+            !allRadarData.length &&
+            !providerLoading.radar
+          ) {
             await refreshRadar()
           }
           break
@@ -227,7 +240,7 @@ export function WeatherPage() {
     console.log({ activeTab, allWeatherData })
 
     fetchTabData()
-  }, [activeTab, refreshRadar, refreshTides, refreshWeather])
+  }, [activeTab, refreshRadar, refreshTides, refreshWeather, isRadarEnabled])
 
   return (
     <div className="space-y-6">
@@ -280,15 +293,21 @@ export function WeatherPage() {
             }
             className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-3 mb-4">
+            <TabsList
+              className={`grid w-full ${
+                isRadarEnabled ? "grid-cols-3" : "grid-cols-2"
+              } mb-4`}
+            >
               <TabsTrigger value="weather">
                 <MapPin className="h-4 w-4 mr-2" />
                 Weather Data
               </TabsTrigger>
-              <TabsTrigger value="radar">
-                <CloudRain className="h-4 w-4 mr-2" />
-                Radar
-              </TabsTrigger>
+              {isRadarEnabled && (
+                <TabsTrigger value="radar">
+                  <CloudRain className="h-4 w-4 mr-2" />
+                  Radar
+                </TabsTrigger>
+              )}
               <TabsTrigger value="tides and waves">
                 <Waves className="h4 w-4 mr-2" />
                 Tides and waves
@@ -301,15 +320,17 @@ export function WeatherPage() {
                   destinations={getDestinations(allWeatherData)}
                 />
               ) : (
-                <div className="h-[700px] flex items-center justify-center">
+                <div className="h-175 flex items-center justify-center">
                   Loading weather data...
                 </div>
               )}
             </TabsContent>
 
-            <TabsContent value="radar" className="mt-0 space-y-4">
-              <Radar />
-            </TabsContent>
+            {isRadarEnabled && (
+              <TabsContent value="radar" className="mt-0 space-y-4">
+                <Radar />
+              </TabsContent>
+            )}
             <TabsContent value="tides and waves" className="mt-0 space-y-4">
               <Tides />
             </TabsContent>
