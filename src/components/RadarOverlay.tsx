@@ -10,7 +10,7 @@ interface RadarOverlayProps {
 const RadarOverlay = ({ opacity = 0.6 }: RadarOverlayProps) => {
   const map = useMap()
   const radarOverlayRef = useRef<google.maps.ImageMapType | null>(null)
-  const { getTileUrl } = useRadar()
+  const { radarAvailable, getTileUrl } = useRadar()
   const [frame, setFrame] = useState<any>(null)
 
   const frameRef = useRef<any>(null)
@@ -65,6 +65,12 @@ const RadarOverlay = ({ opacity = 0.6 }: RadarOverlayProps) => {
     // Build API URL through your proxy endpoint
     const url = getTileUrl(frameRef.current, tomorrowZoom, x, y)
 
+    // If radar is not available or no valid frame, return transparent tile
+    if (!url) {
+      // Return a transparent PNG to avoid broken image icons
+      return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    }
+
     return url
   }
   useEffect(() => {
@@ -108,7 +114,7 @@ const RadarOverlay = ({ opacity = 0.6 }: RadarOverlayProps) => {
         radarOverlayRef.current = null
       }
     }
-  }, [map])
+  }, [map, radarAvailable])
 
   // Listen for radar frame changes from the hook
   useEffect(() => {

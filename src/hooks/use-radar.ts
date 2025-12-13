@@ -101,6 +101,11 @@ export function useRadar({
     }
   }, [])
 
+  // Fetch radar status on initial mount
+  useEffect(() => {
+    fetchRadarStatus()
+  }, [fetchRadarStatus])
+
   useEffect(() => {
     if (!radarAvailable) fetchRadarStatus()
   }, [radarAvailable, fetchRadarStatus])
@@ -128,12 +133,32 @@ export function useRadar({
    * @returns Complete tile URL or null if no radar data
    */
   const getTileUrl = useCallback(
-    (frame: RadarFrame, zoom: number, x: number, y: number): string | null => {
-      if (!radarAvailable || !frame) return null
+    (
+      frame: RadarFrame | null,
+      zoom: number,
+      x: number,
+      y: number
+    ): string | null => {
+      // If radar is not available, return null
+      if (!radarAvailable) {
+        console.log("getTileUrl: radarAvailable is false, returning null")
+        return null
+      }
+
+      // Use the provided frame if available, otherwise use currentFrame
+      const effectiveFrame = frame || currentFrame
+
+      // If no valid frame is available, return null
+      if (!effectiveFrame) {
+        console.log("getTileUrl returning null - no valid frame available")
+        return null
+      }
+
       // frame.time is already in seconds (absolute timestamp) for Tomorrow.io API
-      return `/api/radar/tiles?zoom=${zoom}&x=${x}&y=${y}&field=precipitationIntensity&time=${frame.time}`
+      console.log("getTileUrl returning URL for frame:", effectiveFrame.time)
+      return `/api/radar/tiles?zoom=${zoom}&x=${x}&y=${y}&field=precipitationIntensity&time=${effectiveFrame.time}`
     },
-    [radarAvailable, currentFrameIndex, allFrames]
+    [radarAvailable, currentFrame, currentFrameIndex, allFrames]
   )
 
   /**
