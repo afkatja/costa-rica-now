@@ -31,7 +31,7 @@
     "clouds": "Clouds",
     "forecast5Days": "5-Day Forecast for",
     "weatherMap": "Weather Map",
-    "regionalWeather": "Weather by Regions",
+    "regional": "Weather by Regions",
     "rain": "rain",
     "weatherData": "Weather Data",
     "weatherDataDescription": "Connect with OpenWeather API for real-time meteorological data, precipitation maps, radar and detailed forecasts.",
@@ -45,7 +45,8 @@
       "mild": "20-24°C",
       "cool": "<20°C"
     },
-    "regionalWeather": {
+    "RegionalWeather": {
+      "title": "Weather by Regions",
       "precipitation": "Precipitation",
       "status": "Status",
       "active": "Active",

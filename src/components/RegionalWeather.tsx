@@ -41,6 +41,7 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
       case TabOfRegional.Weather:
         return uniqueLocations
           .map(([key, dest]) => {
+            console.log({ key, allWeatherData })
             const regionWeather = allWeatherData?.find(
               ({ location }: { location: string }) => location === key
             )
@@ -87,16 +88,16 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
       case TabOfRegional.Weather:
         return t("currentConditions")
       case TabOfRegional.Radar:
-        return t("precipitation")
+        return t("RegionalWeather.precipitation")
       case TabOfRegional.TidesAndWaves:
-        return t("coastalConditions")
+        return t("RegionalWeather.coastalConditions")
     }
   }
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-lg font-bold">
-          {t("regionalWeather")}
+          {t("RegionalWeather.title")}
           <span className="text-sm font-normal text-muted-foreground ml-2">
             {getTitle()}
           </span>
@@ -133,14 +134,19 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
                   <>
                     <div className="flex items-center gap-2 mb-2">
                       <CloudRain className="h-5 w-5 text-blue-500" />
-                      <p className="text-sm font-medium">{t("regionalWeather.precipitation")}</p>
+                      <p className="text-sm font-medium">
+                        {t("RegionalWeather.precipitation")}
+                      </p>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {t("regionalWeather.status")}: {item.data.available ? t("regionalWeather.active") : t("regionalWeather.unavailable")}
+                      {t("RegionalWeather.status")}:{" "}
+                      {item.data.available
+                        ? t("RegionalWeather.active")
+                        : t("RegionalWeather.unavailable")}
                     </p>
                     {item.data.lastUpdated && (
                       <p className="text-xs text-muted-foreground">
-                        {t("regionalWeather.updated")}:{" "}
+                        {t("RegionalWeather.updated")}:{" "}
                         {new Date(item.data.lastUpdated).toLocaleTimeString()}
                       </p>
                     )}
@@ -151,21 +157,24 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
                   <>
                     <div className="flex items-center gap-2 mb-2">
                       <Waves className="h-5 w-5 text-blue-500" />
-                      <p className="text-sm font-medium">{t("regionalWeather.coastalConditions")}</p>
+                      <p className="text-sm font-medium">
+                        {t("RegionalWeather.coastalConditions")}
+                      </p>
                     </div>
                     {item.data.waveHeight && (
                       <p className="text-lg font-medium mb-1">
-                        {item.data.waveHeight.toFixed(1)}m {t("regionalWeather.waves")}
+                        {item.data.waveHeight.toFixed(1)}m{" "}
+                        {t("RegionalWeather.waves")}
                       </p>
                     )}
                     {item.data.surfConditions && (
                       <p className="text-xs text-muted-foreground capitalize">
-                        {t("regionalWeather.surf")}: {item.data.surfConditions}
+                        {t("RegionalWeather.surf")}: {item.data.surfConditions}
                       </p>
                     )}
                     {item.data.currentTide && (
                       <p className="text-xs text-muted-foreground">
-                        {t("regionalWeather.tide")}: {item.data.currentTide}
+                        {t("RegionalWeather.tide")}: {item.data.currentTide}
                       </p>
                     )}
                   </>
@@ -174,7 +183,7 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
             ))
           ) : (
             <div className="col-span-full text-center text-muted-foreground py-8">
-              {t("regionalWeather.noData", { tab: activeTab })}
+              {t("RegionalWeather.noData", { tab: activeTab })}
             </div>
           )}
         </div>

@@ -31,7 +31,7 @@
     "clouds": "Nubes",
     "forecast5Days": "Pronóstico 5 Días",
     "weatherMap": "Mapa del Clima",
-    "regionalWeather": "Clima por Regiones",
+    "regional": "Clima por Regiones",
     "rain": "lluvia",
     "weatherData": "Datos del Clima",
     "weatherDataDescription": "Conecte con OpenWeather API para datos meteorológicos en tiempo real, mapas de precipitación, radar y pronósticos detallados.",
@@ -45,7 +45,8 @@
       "mild": "20-24°C",
       "cool": "<20°C"
     },
-    "regionalWeather": {
+    "RegionalWeather": {
+      "title": "Clima por Regiones",
       "precipitation": "Precipitación",
       "status": "Estado",
       "active": "Activo",
