@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import { kv } from "@vercel/kv"
+import { createClient } from "redis"
 import { dayInMs, hourInMs } from "../../../../lib/utils"
 
 const TRANSPARENT_PNG = Buffer.from(
@@ -10,36 +10,39 @@ const TRANSPARENT_PNG = Buffer.from(
 const CACHE_DURATION = 10 * 60 * 1000 // 10 minutes (weather doesn't change that fast)
 
 // External store client with fallback
-let kvClient: typeof kv | null = null
+let redisClient: ReturnType<typeof createClient> | null = null
 let useExternalStore = false
 
-// Initialize KV client safely
-function initializeKV() {
-  if (kvClient !== null) return kvClient
+// Initialize Redis client safely
+async function initializeRedis() {
+  if (redisClient !== null) return redisClient
+  redisClient = createClient({
+    url: process.env.REDIS_URL,
+  })
 
   try {
-    // Check if KV URL is available (production)
-    if (process.env.KV_URL) {
-      kvClient = kv
+    // Check if Redis URL is available (production)
+    if (process.env.REDIS_URL) {
+      await redisClient.connect()
       useExternalStore = true
-      console.log("Using Vercel KV for external storage")
+      console.log("Using Vercel Redis for external storage")
     } else {
-      console.log("KV_URL not found, using in-memory fallback")
+      console.log("REDIS_URL not found, using in-memory fallback")
       useExternalStore = false
     }
   } catch (error) {
     console.warn(
-      "Failed to initialize KV client, using in-memory fallback:",
+      "Failed to initialize Redis client, using in-memory fallback:",
       error
     )
     useExternalStore = false
   }
 
-  return kvClient
+  return redisClient
 }
 
 // Initialize on module load
-initializeKV()
+initializeRedis()
 
 // In-memory fallback for local/dev
 const tileCache = new Map<string, { data: Buffer; timestamp: number }>()
@@ -69,13 +72,13 @@ async function getCachedTile(
   }
 
   try {
-    const cached = await kvClient!.get(`tile:${cacheKey}`)
+    const cached = await redisClient!.get(`tile:${cacheKey}`)
     if (cached) {
       const { data, timestamp } = JSON.parse(cached as string)
       return { data: Buffer.from(data, "base64"), timestamp }
     }
   } catch (error) {
-    console.warn("Failed to get cached tile from KV:", error)
+    console.warn("Failed to get cached tile from Redis:", error)
   }
   return null
 }
@@ -95,11 +98,11 @@ async function setCachedTile(
       data: data.toString("base64"),
       timestamp,
     })
-    await kvClient!.set(`tile:${cacheKey}`, value, {
-      ex: Math.floor(CACHE_DURATION / 1000),
+    await redisClient!.set(`tile:${cacheKey}`, value, {
+      EX: Math.floor(CACHE_DURATION / 1000),
     })
   } catch (error) {
-    console.warn("Failed to set cached tile in KV:", error)
+    console.warn("Failed to set cached tile in Redis:", error)
   }
 }
 
@@ -127,9 +130,9 @@ async function getRateLimitCounters(): Promise<{
 
   try {
     const [hourlyRequests, dailyRequests, lastRequestTime] = await Promise.all([
-      kvClient!.get(`ratelimit:hourly`),
-      kvClient!.get(`ratelimit:daily`),
-      kvClient!.get(`ratelimit:lastRequestTime`),
+      redisClient!.get(`ratelimit:hourly`),
+      redisClient!.get(`ratelimit:daily`),
+      redisClient!.get(`ratelimit:lastRequestTime`),
     ])
 
     return {
@@ -138,7 +141,7 @@ async function getRateLimitCounters(): Promise<{
       lastRequestTime: parseInt(lastRequestTime as string) || 0,
     }
   } catch (error) {
-    console.warn("Failed to get rate limit counters from KV:", error)
+    console.warn("Failed to get rate limit counters from Redis:", error)
     return {
       hourlyRequests: rateLimiter.hourlyRequests.length,
       dailyRequests: rateLimiter.dailyRequests.length,
@@ -162,19 +165,19 @@ async function recordRateLimitRequest() {
     const now = Date.now()
 
     await Promise.all([
-      kvClient!.incr(`ratelimit:hourly`),
-      kvClient!.incr(`ratelimit:daily`),
-      kvClient!.set(`ratelimit:lastRequestTime`, now),
+      redisClient!.incr(`ratelimit:hourly`),
+      redisClient!.incr(`ratelimit:daily`),
+      redisClient!.set(`ratelimit:lastRequestTime`, now),
     ])
 
     // Set TTLs for automatic reset
     await Promise.all([
-      kvClient!.expire(`ratelimit:hourly`, 3600), // 1 hour
-      kvClient!.expire(`ratelimit:daily`, 86400), // 1 day
-      kvClient!.expire(`ratelimit:lastRequestTime`, 3600),
+      redisClient!.expire(`ratelimit:hourly`, 3600), // 1 hour
+      redisClient!.expire(`ratelimit:daily`, 86400), // 1 day
+      redisClient!.expire(`ratelimit:lastRequestTime`, 3600),
     ])
   } catch (error) {
-    console.warn("Failed to record rate limit request in KV:", error)
+    console.warn("Failed to record rate limit request in Redis:", error)
     // Fallback to in-memory
     const now = Date.now()
     pruneRateLimiter(now)
