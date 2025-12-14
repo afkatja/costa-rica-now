@@ -1,21 +1,41 @@
-import { COSTA_RICA_BOUNDS } from "../_shared/coords.ts"
-import { corsHeaders } from "../_shared/cors.ts"
+import { COSTA_RICA_BOUNDS } from "../_shared/coords.js"
+import { corsHeaders } from "../_shared/cors.js"
 import cheerio from "https://esm.sh/cheerio@1.0.0-rc.12"
 
-const normalizeOvsicori = (quake: any) => ({
+// Helper function to format datetime for Costa Rica locale
+function formatDateTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleString("es-CR", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+// Helper function to add formatted fields to SeismicEvent
+function addFormattedFields(event: SeismicEvent): SeismicEvent {
+  return {
+    ...event,
+    formattedTime: formatDateTime(event.time),
+    formattedDateTime: formatDateTime(event.time),
+  }
+}
+
+const normalizeOvsicori = (quake: any): SeismicEvent => ({
   id: `ovsicori-${quake["Fecha y Hora Local"].replace(
     /\D/g,
     ""
   )}-${quake.lat.toFixed(3)}-${quake.lon.toFixed(3)}`,
-  source: "ovsicori",
+  source: "ovsicori" as const,
   magnitude: parseFloat(quake.Magnitud),
   location: quake.Ubicacion,
   lat: quake.lat,
   lon: quake.lon,
   depth: quake["Prof. km"] ? parseFloat(quake["Prof. km"]) : null,
   time: new Date(`${quake["Fecha y Hora Local"]} UTC-6`).getTime(), // Costa Rica local time → timestamp
-  felt: null, // OVSICORI doesn’t provide direct “felt” count
-  intensity: null, // no direct intensity
+  // felt: null, // OVSICORI doesn't provide direct "felt" count
+  // intensity: null, // no direct intensity
   tsunami: false, // not available
   status: quake.Autor || "unknown",
   url: quake.url,
@@ -29,13 +49,16 @@ interface SeismicEvent {
   location: string
   lat: number
   lon: number
-  depth: number
+  depth: number | null
   time: number // Unix timestamp in milliseconds
   felt?: number
   intensity?: number
   tsunami: boolean
   url?: string
   status?: string
+  // Formatted date/time fields for client convenience
+  formattedTime?: string
+  formattedDateTime?: string
 }
 
 interface FetchParams {
@@ -43,6 +66,10 @@ interface FetchParams {
   endDate: string
   minMagnitude?: number
   maxMagnitude?: number
+  source?: "usgs" | "ovsicori" | "rsn" | "manual"
+  lat?: number
+  lon?: number
+  radiusKm?: number
   limit?: number
   offset?: number
 }
@@ -80,22 +107,24 @@ async function fetchUSGSData(params: FetchParams): Promise<SeismicEvent[]> {
 
   const data = await response.json()
 
-  // Transform to unified format
-  return data.features.map((feature: any) => ({
-    id: `usgs-${feature.id}`,
-    source: "usgs" as const,
-    magnitude: feature.properties.mag,
-    location: feature.properties.place,
-    lat: feature.geometry.coordinates[1],
-    lon: feature.geometry.coordinates[0],
-    depth: feature.geometry.coordinates[2],
-    time: feature.properties.time,
-    felt: feature.properties.felt,
-    intensity: feature.properties.cdi,
-    tsunami: feature.properties.tsunami === 1,
-    url: feature.properties.url,
-    status: feature.properties.status,
-  }))
+  // Transform to unified format and add formatted fields
+  return data.features.map((feature: any) =>
+    addFormattedFields({
+      id: `usgs-${feature.id}`,
+      source: "usgs" as const,
+      magnitude: feature.properties.mag,
+      location: feature.properties.place,
+      lat: feature.geometry.coordinates[1],
+      lon: feature.geometry.coordinates[0],
+      depth: feature.geometry.coordinates[2],
+      time: feature.properties.time,
+      felt: feature.properties.felt,
+      intensity: feature.properties.cdi,
+      tsunami: feature.properties.tsunami === 1,
+      url: feature.properties.url,
+      status: feature.properties.status,
+    })
+  )
 }
 
 // Fetch OVSICORI data
@@ -133,8 +162,8 @@ async function fetchOVSICORIData(params: FetchParams): Promise<SeismicEvent[]> {
 
       // Optional: parse the popupHtml with cheerio for easy extraction
       const $ = cheerio.load(popupHtml)
-      const data = {}
-      $("tr").each((i, el) => {
+      const data: Record<string, string> = {}
+      $("tr").each((i: number, el: any) => {
         const tds = $(el).find("td")
         const key = $(tds[0])
           .text()
@@ -152,7 +181,7 @@ async function fetchOVSICORIData(params: FetchParams): Promise<SeismicEvent[]> {
       })
     }
 
-    return earthquakes.map(normalizeOvsicori)
+    return earthquakes.map(normalizeOvsicori).map(addFormattedFields)
   } catch (error) {
     console.error("OVSICORI fetch error:", error)
     return []
@@ -207,21 +236,23 @@ async function fetchRSNData(params: FetchParams): Promise<SeismicEvent[]> {
           contributor?.toLowerCase().includes("ucr")
         )
       })
-      .map((feature: any) => ({
-        id: `rsn-${feature.id}`,
-        source: "rsn" as const,
-        magnitude: feature.properties.mag,
-        location: feature.properties.place,
-        lat: feature.geometry.coordinates[1],
-        lon: feature.geometry.coordinates[0],
-        depth: feature.geometry.coordinates[2],
-        time: feature.properties.time,
-        felt: feature.properties.felt,
-        intensity: feature.properties.cdi,
-        tsunami: feature.properties.tsunami === 1,
-        url: feature.properties.url,
-        status: feature.properties.status,
-      }))
+      .map((feature: any) =>
+        addFormattedFields({
+          id: `rsn-${feature.id}`,
+          source: "rsn" as const,
+          magnitude: feature.properties.mag,
+          location: feature.properties.place,
+          lat: feature.geometry.coordinates[1],
+          lon: feature.geometry.coordinates[0],
+          depth: feature.geometry.coordinates[2],
+          time: feature.properties.time,
+          felt: feature.properties.felt,
+          intensity: feature.properties.cdi,
+          tsunami: feature.properties.tsunami === 1,
+          url: feature.properties.url,
+          status: feature.properties.status,
+        })
+      )
   } catch (error) {
     console.error("RSN fetch error:", error)
     return []
@@ -239,8 +270,8 @@ function deduplicateEvents(events: SeismicEvent[]): SeismicEvent[] {
       // - Within ~50km (0.5 degrees)
       // - Magnitude difference < 0.3
       const timeDiff = Math.abs(event.time - existing.time)
-      const latDiff = Math.abs(event.latitude - existing.latitude)
-      const lonDiff = Math.abs(event.longitude - existing.longitude)
+      const latDiff = Math.abs(event.lat - existing.lat)
+      const lonDiff = Math.abs(event.lon - existing.lon)
       const magDiff = Math.abs(event.magnitude - existing.magnitude)
 
       return (
@@ -257,8 +288,8 @@ function deduplicateEvents(events: SeismicEvent[]): SeismicEvent[] {
       // Prefer OVSICORI over USGS for duplicates (local source is more accurate)
       const existingIndex = deduplicated.findIndex(existing => {
         const timeDiff = Math.abs(event.time - existing.time)
-        const latDiff = Math.abs(event.latitude - existing.latitude)
-        const lonDiff = Math.abs(event.longitude - existing.longitude)
+        const latDiff = Math.abs(event.lat - existing.lat)
+        const lonDiff = Math.abs(event.lon - existing.lon)
         const magDiff = Math.abs(event.magnitude - existing.magnitude)
 
         return (
@@ -284,13 +315,47 @@ function deduplicateEvents(events: SeismicEvent[]): SeismicEvent[] {
   return deduplicated
 }
 
+// Calculate distance between two coordinates (Haversine formula)
+function calculateDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371 // Radius of the Earth in kilometers
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLon = ((lon2 - lon1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
+// Filter events by location radius
+function filterEventsByLocation(
+  events: SeismicEvent[],
+  lat?: number,
+  lon?: number,
+  radiusKm?: number
+): SeismicEvent[] {
+  if (!lat || !lon || !radiusKm) return events
+
+  return events.filter(
+    event => calculateDistance(lat, lon, event.lat, event.lon) <= radiusKm
+  )
+}
+
 // Sort events by time (newest first)
 function sortEvents(events: SeismicEvent[]): SeismicEvent[] {
   return events.sort((a, b) => b.time - a.time)
 }
 
 // Main handler
-Deno.serve(async req => {
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders })
