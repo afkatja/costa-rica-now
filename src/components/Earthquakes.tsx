@@ -107,7 +107,7 @@ const Earthquakes = ({
   const geolocation = useGeolocation()
   const currentPosition = position || geolocation.position
   const currentRequestLocation = requestLocation || geolocation.requestLocation
-  const isWithinRadius = geolocation.isWithinRadius
+  // const isWithinRadius = geolocation.isWithinRadius
 
   // Filter handlers - use props if provided, otherwise update local state
   const handleTimeFilterChange = (value: TimeFilter) => {
@@ -229,13 +229,13 @@ const Earthquakes = ({
 
   const hasActiveFilters = isServerSideFiltered
     ? filters &&
-      (filters.timeFilter !== "all" ||
+      (filters.timeFilter !== TimeFilter.All ||
         filters.magnitudeFilter ||
-        filters.sourceFilter !== "all" ||
+        filters.sourceFilter !== SourceFilter.All ||
         filters.locationFilter)
-    : timeFilter !== "all" ||
+    : timeFilter !== TimeFilter.All ||
       magnitudeFilter ||
-      sourceFilter !== "all" ||
+      sourceFilter !== SourceFilter.All ||
       locationFilter
 
   if (loading) {
@@ -336,7 +336,9 @@ const Earthquakes = ({
                 </SelectTrigger>
                 <SelectContent>
                   {Object.values(TimeFilter).map(value => (
-                    <SelectItem value={value}>{t(value)}</SelectItem>
+                    <SelectItem key={value} value={value}>
+                      {t(value)}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -407,12 +409,14 @@ const Earthquakes = ({
           {hasActiveFilters && (
             <div className="mt-4 pt-4 border-t">
               <div className="flex flex-wrap gap-2">
-                {timeFilter !== "all" && (
+                {timeFilter !== TimeFilter.All && (
                   <Badge variant="secondary">
-                    {timeFilter === "24h" && t("last24Hours")}
-                    {timeFilter === "3d" && t("last3Days")}
-                    {timeFilter === "week" && t("lastWeek")}
-                    {timeFilter === "month" && t("lastMonth")}
+                    {timeFilter === TimeFilter.Last24Hours &&
+                      t(TimeFilter.Last24Hours)}
+                    {timeFilter === TimeFilter.Last3Days &&
+                      t(TimeFilter.Last3Days)}
+                    {timeFilter === TimeFilter.Week && t(TimeFilter.Week)}
+                    {timeFilter === TimeFilter.Month && t(TimeFilter.Month)}
                     <X
                       className="h-3 w-3 ml-1 cursor-pointer"
                       onClick={() => handleTimeFilterChange(TimeFilter.All)}
@@ -428,12 +432,12 @@ const Earthquakes = ({
                     />
                   </Badge>
                 )}
-                {sourceFilter !== "all" && (
+                {sourceFilter !== SourceFilter.All && (
                   <Badge variant="secondary">
                     {sourceFilter.toUpperCase()}
                     <X
                       className="h-3 w-3 ml-1 cursor-pointer"
-                      onClick={() => handleSourceFilterChange("all")}
+                      onClick={() => handleSourceFilterChange(SourceFilter.All)}
                     />
                   </Badge>
                 )}

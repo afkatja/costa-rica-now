@@ -39,9 +39,11 @@ export function SeismicPage() {
     "earthquakes"
   )
   // Filter states
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("all")
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>(TimeFilter.All)
   const [magnitudeFilter, setMagnitudeFilter] = useState(false)
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all")
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(
+    SourceFilter.All
+  )
   const [locationFilter, setLocationFilter] = useState(false)
 
   const {
@@ -49,7 +51,7 @@ export function SeismicPage() {
     loading: geoLoading,
     error: geoError,
     requestLocation,
-    isInCostaRica,
+    // isInCostaRica,
   } = useGeolocation()
 
   // Request location permission on mount
@@ -66,26 +68,32 @@ export function SeismicPage() {
       setEarthquakesLoading(true)
       setError(null)
 
-      const offset = (page - 1) * itemsPerPage
-
+      // const offset = (page - 1) * itemsPerPage
+      const now = new Date()
+      const timeRanges: Record<string, number> = {
+        [TimeFilter.Last24Hours]: 24 * 60 * 60 * 1000,
+        [TimeFilter.Last3Days]: 3 * 24 * 60 * 60 * 1000,
+        [TimeFilter.Week]: 7 * 24 * 60 * 60 * 1000,
+        [TimeFilter.Month]: 30 * 24 * 60 * 60 * 1000,
+      }
       // Calculate date range based on filter
       let startDate: string
       const endDate = new Date().toISOString().split("T")[0]
 
-      if (filters?.timeFilter && filters.timeFilter !== TimeFilter.All) {
-        const now = new Date()
-        const timeRanges: Record<string, number> = {
-          "24h": 24 * 60 * 60 * 1000,
-          "3d": 3 * 24 * 60 * 60 * 1000,
-          week: 7 * 24 * 60 * 60 * 1000,
-          month: 30 * 24 * 60 * 60 * 1000,
-        }
+      // Handle date range calculation with proper null checking
+      if (
+        filters &&
+        filters.timeFilter &&
+        filters.timeFilter !== TimeFilter.All &&
+        timeRanges[filters.timeFilter]
+      ) {
         startDate = new Date(now.getTime() - timeRanges[filters.timeFilter])
           .toISOString()
           .split("T")[0]
       } else {
         // Default to 1 month
-        startDate = new Date(new Date().getTime() - 31 * 24 * 60 * 60 * 1000)
+        const defaultTimeRange = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
+        startDate = new Date(now.getTime() - defaultTimeRange)
           .toISOString()
           .split("T")[0]
       }
@@ -118,7 +126,6 @@ export function SeismicPage() {
         body: requestBody,
       })
 
-      console.log("SEISMIC DATA", { response, filters })
       setEarthquakes(response.data.events)
       setTotalEarthquakes(response.data.metadata.stats.total)
       setEarthquakeStats(response.data.metadata.stats)
@@ -180,8 +187,6 @@ export function SeismicPage() {
   }, [position, geoLoading, geoError, requestLocation])
 
   useEffect(() => {
-    console.log({ activeTab })
-
     if (activeTab === "earthquakes") fetchSeismicData()
     if (activeTab === "volcanoes") fetchVolcanoes()
   }, [activeTab])
