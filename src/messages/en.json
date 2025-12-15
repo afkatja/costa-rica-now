@@ -129,6 +129,7 @@
     "within50km": "Within 50km",
     "locationRequired": "Location access required",
     "filteredResults": "Filtered results",
-    "noFilteredResults": "No results match the current filters"
+    "noFilteredResults": "No results match the current filters",
+    "loading": "Loading earthquakes..."
   }
 }

@@ -22,6 +22,7 @@ import { SeismicEvent, SeismicDataResponse } from "../types/seismic"
 export function SeismicPage() {
   const t = useTranslations("SeismicPage")
   const [loading, setLoading] = useState(false)
+  const [earthquakesLoading, setEarthquakesLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [earthquakes, setEarthquakes] = useState<SeismicEvent[]>([])
   const [totalEarthquakes, setTotalEarthquakes] = useState(0)
@@ -65,6 +66,7 @@ export function SeismicPage() {
   const fetchSeismicData = async (page: number = 1, filters?: any) => {
     try {
       setLoading(true)
+      setEarthquakesLoading(true)
       setError(null)
 
       const offset = (page - 1) * itemsPerPage
@@ -129,6 +131,7 @@ export function SeismicPage() {
       setError(error instanceof Error ? error.message : "Unknown error")
     } finally {
       setLoading(false)
+      setEarthquakesLoading(false)
     }
   }
 
@@ -248,6 +251,7 @@ export function SeismicPage() {
             stats={earthquakeStats}
             currentPage={currentPage}
             itemsPerPage={itemsPerPage}
+            loading={earthquakesLoading}
             onPageChange={page =>
               fetchSeismicData(page, {
                 timeFilter,

@@ -34,6 +34,7 @@ import {
 import { useTranslations } from "next-intl"
 import { SeismicEvent } from "../types/seismic"
 import { useGeolocation } from "../hooks/use-geolocation"
+import LoadingSpinner from "./Loader"
 
 interface EarthquakesProps {
   earthquakes: SeismicEvent[] | null
@@ -41,6 +42,7 @@ interface EarthquakesProps {
   stats: any
   currentPage: number
   itemsPerPage: number
+  loading?: boolean
   onPageChange: (page: number) => void
   filters?: {
     timeFilter: "all" | "24h" | "3d" | "week" | "month"
@@ -74,6 +76,7 @@ const Earthquakes = ({
   stats,
   currentPage,
   itemsPerPage,
+  loading = false,
   onPageChange,
   filters,
   onFilterChange,
@@ -206,6 +209,15 @@ const Earthquakes = ({
       magnitudeFilter ||
       sourceFilter !== "all" ||
       locationFilter
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <LoadingSpinner size="lg" className="text-primary" />
+        <span className="ml-2 text-muted-foreground">{t("loading")}</span>
+      </div>
+    )
+  }
 
   if (!earthquakes)
     return (
