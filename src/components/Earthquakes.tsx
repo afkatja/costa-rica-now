@@ -35,6 +35,7 @@ import { useTranslations } from "next-intl"
 import { SeismicEvent } from "../types/seismic"
 import { useGeolocation } from "../hooks/use-geolocation"
 import LoadingSpinner from "./Loader"
+import { TimeFilter, SourceFilter } from "../types/filters"
 
 interface EarthquakesProps {
   earthquakes: SeismicEvent[] | null
@@ -45,17 +46,15 @@ interface EarthquakesProps {
   loading?: boolean
   onPageChange: (page: number) => void
   filters?: {
-    timeFilter: "all" | "24h" | "3d" | "week" | "month"
+    timeFilter: TimeFilter
     magnitudeFilter: boolean
-    sourceFilter: "all" | "usgs" | "ovsicori" | "rsn" | "manual"
+    sourceFilter: SourceFilter
     locationFilter: boolean
   }
   onFilterChange?: {
-    setTimeFilter: (value: "all" | "24h" | "3d" | "week" | "month") => void
+    setTimeFilter: (value: TimeFilter) => void
     setMagnitudeFilter: (value: boolean) => void
-    setSourceFilter: (
-      value: "all" | "usgs" | "ovsicori" | "rsn" | "manual"
-    ) => void
+    setSourceFilter: (value: SourceFilter) => void
     setLocationFilter: (value: boolean) => void
   }
   position?: {
@@ -65,10 +64,6 @@ interface EarthquakesProps {
   } | null
   requestLocation?: () => void
 }
-
-// Filter types (keep for local state fallback)
-type TimeFilter = "all" | "24h" | "3d" | "week" | "month"
-type SourceFilter = "all" | "usgs" | "ovsicori" | "rsn" | "manual"
 
 const Earthquakes = ({
   earthquakes,
@@ -87,13 +82,13 @@ const Earthquakes = ({
 
   // Use filter props if provided, otherwise fall back to local state for backwards compatibility
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(
-    filters?.timeFilter || "all"
+    filters?.timeFilter || TimeFilter.All
   )
   const [magnitudeFilter, setMagnitudeFilter] = useState(
     filters?.magnitudeFilter || false
   )
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>(
-    filters?.sourceFilter || "all"
+    filters?.sourceFilter || SourceFilter.All
   )
   const [locationFilter, setLocationFilter] = useState(
     filters?.locationFilter || false
@@ -109,7 +104,6 @@ const Earthquakes = ({
     }
   }, [filters])
 
-  // Geolocation - use prop or hook
   const geolocation = useGeolocation()
   const currentPosition = position || geolocation.position
   const currentRequestLocation = requestLocation || geolocation.requestLocation
@@ -155,14 +149,14 @@ const Earthquakes = ({
 
   const clearAllFilters = () => {
     if (onFilterChange) {
-      onFilterChange.setTimeFilter("all")
+      onFilterChange.setTimeFilter(TimeFilter.All)
       onFilterChange.setMagnitudeFilter(false)
-      onFilterChange.setSourceFilter("all")
+      onFilterChange.setSourceFilter(SourceFilter.All)
       onFilterChange.setLocationFilter(false)
     } else {
-      setTimeFilter("all")
+      setTimeFilter(TimeFilter.All)
       setMagnitudeFilter(false)
-      setSourceFilter("all")
+      setSourceFilter(SourceFilter.All)
       setLocationFilter(false)
     }
   }
@@ -198,6 +192,40 @@ const Earthquakes = ({
     startIndex,
     startIndex + itemsPerPage
   )
+
+  // Generate pagination pages with ellipsis
+  const getPaginationPages = () => {
+    const pages: (number | string)[] = []
+    const showEllipsisThreshold = 7
+
+    if (totalPages <= showEllipsisThreshold) {
+      // Show all pages if total is small
+      return Array.from({ length: totalPages }, (_, i) => i + 1)
+    }
+
+    // Always show first page
+    pages.push(1)
+
+    if (currentPage <= 4) {
+      // Near the beginning
+      pages.push(2, 3, 4, 5)
+      pages.push("...")
+    } else if (currentPage >= totalPages - 3) {
+      // Near the end
+      pages.push("...")
+      pages.push(totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1)
+    } else {
+      // In the middle
+      pages.push("...")
+      pages.push(currentPage - 1, currentPage, currentPage + 1)
+      pages.push("...")
+    }
+
+    // Always show last page
+    pages.push(totalPages)
+
+    return pages
+  }
 
   const hasActiveFilters = isServerSideFiltered
     ? filters &&
@@ -298,16 +326,18 @@ const Earthquakes = ({
             {/* Time Filter */}
             <div className="space-y-2">
               <label className="text-sm font-medium">{t("timePeriod")}</label>
-              <Select value={timeFilter} onValueChange={handleTimeFilterChange}>
+              <Select
+                value={timeFilter}
+                onValueChange={handleTimeFilterChange}
+                defaultValue={TimeFilter.All}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{t("allTime")}</SelectItem>
-                  <SelectItem value="24h">{t("last24Hours")}</SelectItem>
-                  <SelectItem value="3d">{t("last3Days")}</SelectItem>
-                  <SelectItem value="week">{t("lastWeek")}</SelectItem>
-                  <SelectItem value="month">{t("lastMonth")}</SelectItem>
+                  {Object.values(TimeFilter).map(value => (
+                    <SelectItem value={value}>{t(value)}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -385,7 +415,7 @@ const Earthquakes = ({
                     {timeFilter === "month" && t("lastMonth")}
                     <X
                       className="h-3 w-3 ml-1 cursor-pointer"
-                      onClick={() => handleTimeFilterChange("all")}
+                      onClick={() => handleTimeFilterChange(TimeFilter.All)}
                     />
                   </Badge>
                 )}
@@ -507,14 +537,18 @@ const Earthquakes = ({
                   }
                 />
               </PaginationItem>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => onPageChange(page)}
-                    isActive={currentPage === page}
-                  >
-                    {page}
-                  </PaginationLink>
+              {getPaginationPages().map((page, index) => (
+                <PaginationItem key={index}>
+                  {page === "..." ? (
+                    <span className="px-3 py-2 text-muted-foreground">...</span>
+                  ) : (
+                    <PaginationLink
+                      onClick={() => onPageChange(page as number)}
+                      isActive={currentPage === page}
+                    >
+                      {page}
+                    </PaginationLink>
+                  )}
                 </PaginationItem>
               ))}
               <PaginationItem>

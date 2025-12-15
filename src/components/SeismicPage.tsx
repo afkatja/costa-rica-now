@@ -18,6 +18,7 @@ import Earthquakes from "./Earthquakes"
 import Volcanoes from "./Volcanoes"
 import { useTranslations } from "next-intl"
 import { SeismicEvent, SeismicDataResponse } from "../types/seismic"
+import { TimeFilter, SourceFilter } from "../types/filters"
 
 export function SeismicPage() {
   const t = useTranslations("SeismicPage")
@@ -38,13 +39,9 @@ export function SeismicPage() {
     "earthquakes"
   )
   // Filter states
-  const [timeFilter, setTimeFilter] = useState<
-    "all" | "24h" | "3d" | "week" | "month"
-  >("all")
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("all")
   const [magnitudeFilter, setMagnitudeFilter] = useState(false)
-  const [sourceFilter, setSourceFilter] = useState<
-    "all" | "usgs" | "ovsicori" | "rsn" | "manual"
-  >("all")
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all")
   const [locationFilter, setLocationFilter] = useState(false)
 
   const {
@@ -75,7 +72,7 @@ export function SeismicPage() {
       let startDate: string
       const endDate = new Date().toISOString().split("T")[0]
 
-      if (filters?.timeFilter && filters.timeFilter !== "all") {
+      if (filters?.timeFilter && filters.timeFilter !== TimeFilter.All) {
         const now = new Date()
         const timeRanges: Record<string, number> = {
           "24h": 24 * 60 * 60 * 1000,
@@ -106,7 +103,7 @@ export function SeismicPage() {
         requestBody.minMagnitude = 5
       }
 
-      if (filters?.sourceFilter && filters.sourceFilter !== "all") {
+      if (filters?.sourceFilter && filters.sourceFilter !== SourceFilter.All) {
         requestBody.source = filters.sourceFilter
       }
 
