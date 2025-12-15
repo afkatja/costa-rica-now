@@ -94,6 +94,7 @@
     "alert": "Alert",
     "temperature": "Temp",
     "celsius": "°C",
+    "unknown": "Unknown",
     "lastEruption": "Last eruption"
   },
   "Earthquakes": {
@@ -107,6 +108,27 @@
     "depth": "Depth",
     "km": "km",
     "magnitude": "M",
-    "na": "N/A"
+    "na": "N/A",
+    "source": "Source",
+    "status": "Status",
+    "unknown": "Unknown",
+    "filters": "Filters",
+    "clearFilters": "Clear filters",
+    "timePeriod": "Time period",
+    "minimumMagnitude": "Minimum magnitude",
+    "nearby": "Nearby",
+    "allTime": "All time",
+    "last24Hours": "Last 24 hours",
+    "last3Days": "Last 3 days",
+    "lastWeek": "Last week",
+    "lastMonth": "Last month",
+    "allMagnitudes": "All magnitudes",
+    "allSources": "All sources",
+    "manual": "Manual",
+    "enableLocation": "Enable location",
+    "within50km": "Within 50km",
+    "locationRequired": "Location access required",
+    "filteredResults": "Filtered results",
+    "noFilteredResults": "No results match the current filters"
   }
 }

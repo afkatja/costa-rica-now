@@ -107,6 +107,27 @@
     "depth": "Profundidad",
     "km": "km",
     "magnitude": "M",
-    "na": "N/A"
+    "na": "N/A",
+    "source": "Fuente",
+    "status": "estado",
+    "unknown": "Desconocido",
+    "filters": "Filtros",
+    "clearFilters": "Limpiar filtros",
+    "timePeriod": "Período de tiempo",
+    "minimumMagnitude": "Magnitud mínima",
+    "nearby": "Cercanos",
+    "allTime": "Todo el tiempo",
+    "last24Hours": "Últimas 24 horas",
+    "last3Days": "Últimos 3 días",
+    "lastWeek": "Última semana",
+    "lastMonth": "Último mes",
+    "allMagnitudes": "Todas las magnitudes",
+    "allSources": "Todas las fuentes",
+    "manual": "Manual",
+    "enableLocation": "Habilitar ubicación",
+    "within50km": "Dentro de 50km",
+    "locationRequired": "Se requiere acceso a ubicación",
+    "filteredResults": "Resultados filtrados",
+    "noFilteredResults": "No hay resultados que coincidan con los filtros actuales"
   }
 }
