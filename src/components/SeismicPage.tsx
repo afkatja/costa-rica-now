@@ -17,24 +17,17 @@ import { useGeolocation } from "../hooks/use-geolocation"
 import Earthquakes from "./Earthquakes"
 import Volcanoes from "./Volcanoes"
 import { useTranslations } from "next-intl"
-
-export const formatDateTime = (timeString: string) => {
-  return new Date(timeString).toLocaleString("es-CR", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
+import { SeismicEvent, SeismicDataResponse } from "../types/seismic"
 
 export function SeismicPage() {
   const t = useTranslations("SeismicPage")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [earthquakes, setEarthquakes] = useState<any[]>([])
+  const [earthquakes, setEarthquakes] = useState<SeismicEvent[]>([])
   const [totalEarthquakes, setTotalEarthquakes] = useState(0)
-  const [earthquakeStats, setEarthquakeStats] = useState<any>(null)
+  const [earthquakeStats, setEarthquakeStats] = useState<
+    SeismicDataResponse["metadata"]["stats"] | null
+  >(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [volcanoes, setVolcanoes] = useState<any[]>([])
@@ -43,6 +36,16 @@ export function SeismicPage() {
   const [activeTab, setActiveTab] = useState<"earthquakes" | "volcanoes">(
     "earthquakes"
   )
+  // Filter states
+  const [timeFilter, setTimeFilter] = useState<
+    "all" | "24h" | "3d" | "week" | "month"
+  >("all")
+  const [magnitudeFilter, setMagnitudeFilter] = useState(false)
+  const [sourceFilter, setSourceFilter] = useState<
+    "all" | "usgs" | "ovsicori" | "rsn" | "manual"
+  >("all")
+  const [locationFilter, setLocationFilter] = useState(false)
+
   const {
     position,
     loading: geoLoading,
@@ -59,24 +62,64 @@ export function SeismicPage() {
     // if (geoError) setError(geoError)
   }, [position, geoLoading, geoError, requestLocation])
 
-  const fetchSeismicData = async (page: number = 1) => {
+  const fetchSeismicData = async (page: number = 1, filters?: any) => {
     try {
       setLoading(true)
       setError(null)
 
       const offset = (page - 1) * itemsPerPage
+
+      // Calculate date range based on filter
+      let startDate: string
+      const endDate = new Date().toISOString().split("T")[0]
+
+      if (filters?.timeFilter && filters.timeFilter !== "all") {
+        const now = new Date()
+        const timeRanges: Record<string, number> = {
+          "24h": 24 * 60 * 60 * 1000,
+          "3d": 3 * 24 * 60 * 60 * 1000,
+          week: 7 * 24 * 60 * 60 * 1000,
+          month: 30 * 24 * 60 * 60 * 1000,
+        }
+        startDate = new Date(now.getTime() - timeRanges[filters.timeFilter])
+          .toISOString()
+          .split("T")[0]
+      } else {
+        // Default to 1 month
+        startDate = new Date(new Date().getTime() - 31 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0]
+      }
+
+      const requestBody: any = {
+        startDate,
+        endDate,
+        type: "earthquake",
+        // limit: itemsPerPage,
+        // offset,
+      }
+
+      // Add filters to request
+      if (filters?.magnitudeFilter) {
+        requestBody.minMagnitude = 5
+      }
+
+      if (filters?.sourceFilter && filters.sourceFilter !== "all") {
+        requestBody.source = filters.sourceFilter
+      }
+
+      // Add location-based filtering if enabled and position available
+      if (filters?.locationFilter && position) {
+        requestBody.lat = position.latitude
+        requestBody.lon = position.longitude
+        requestBody.radiusKm = 50
+      }
+
       const response = await supabase.functions.invoke("seismic-service", {
-        body: {
-          startDate: new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split("T")[0],
-          endDate: new Date().toISOString().split("T")[0],
-          type: "earthquake",
-          limit: itemsPerPage,
-          offset,
-        },
+        body: requestBody,
       })
-      console.log("SEISMIC DATA", { response })
+
+      console.log("SEISMIC DATA", { response, filters })
       setEarthquakes(response.data.events)
       setTotalEarthquakes(response.data.metadata.stats.total)
       setEarthquakeStats(response.data.metadata.stats)
@@ -109,6 +152,24 @@ export function SeismicPage() {
       setVolcanoLoading(false)
     }
   }
+
+  // Handle filter changes
+  const handleFilterChange = () => {
+    const filters = {
+      timeFilter,
+      magnitudeFilter,
+      sourceFilter,
+      locationFilter,
+    }
+    fetchSeismicData(1, filters) // Reset to page 1 when filters change
+  }
+
+  // Watch for filter changes and refetch data
+  useEffect(() => {
+    if (activeTab === "earthquakes") {
+      handleFilterChange()
+    }
+  }, [timeFilter, magnitudeFilter, sourceFilter, locationFilter, activeTab])
 
   // Request location permission and fetch seismic data on mount
   useEffect(() => {
@@ -187,7 +248,28 @@ export function SeismicPage() {
             stats={earthquakeStats}
             currentPage={currentPage}
             itemsPerPage={itemsPerPage}
-            onPageChange={fetchSeismicData}
+            onPageChange={page =>
+              fetchSeismicData(page, {
+                timeFilter,
+                magnitudeFilter,
+                sourceFilter,
+                locationFilter,
+              })
+            }
+            filters={{
+              timeFilter,
+              magnitudeFilter,
+              sourceFilter,
+              locationFilter,
+            }}
+            onFilterChange={{
+              setTimeFilter,
+              setMagnitudeFilter,
+              setSourceFilter,
+              setLocationFilter,
+            }}
+            position={position}
+            requestLocation={requestLocation}
           />
         </TabsContent>
 

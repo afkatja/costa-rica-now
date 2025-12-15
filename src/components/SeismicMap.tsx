@@ -1,14 +1,10 @@
 "use client"
-import { useState } from "react"
-import { MapTooltip } from "./MapTooltip"
-import { mockSeismicData } from "../utils/mockSeismicData"
-import { Activity, Mountain, Clock, AlertTriangle } from "lucide-react"
-import { Badge } from "./ui/badge"
 import { useGeolocation } from "../hooks/use-geolocation"
 import { baseColorScheme, ColorSet } from "./Marker"
 import MapTooltipContent from "./MapTooltipContent"
 import GoogleMapsWrapper from "./GoogleMapsWrapper"
 import { useTranslations } from "next-intl"
+import { SeismicEvent } from "../types/seismic"
 
 type PinType = "earthquake" | "volcano"
 
@@ -17,7 +13,7 @@ interface SeismicPin {
   type: PinType
   lat: number
   lng: number
-  data: any
+  data: SeismicEvent | any
 }
 
 const getMagnitudeColorScheme = (magnitude: number): ColorSet => {
@@ -45,22 +41,13 @@ export function SeismicMap({
   locations,
   type,
 }: {
-  locations: any[] | null
+  locations: SeismicEvent[] | any[] | null
   type: "earthquake" | "volcano"
 }) {
   const t = useTranslations("SeismicMap")
   // Get user's location context
-  const { position, isInCostaRica, isWithinRadius } = useGeolocation()
+  const { position, isInCostaRica } = useGeolocation()
   if (!locations) return t("noData")
-
-  const formatDateTime = (timeString: string) => {
-    return new Date(timeString).toLocaleString("es-CR", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
 
   const pins = locations.map(loc => {
     const isEarthquake = type === "earthquake"
@@ -98,9 +85,13 @@ export function SeismicMap({
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex items-center gap-1">
-                  <span>{formatDateTime(loc.time)}</span>
+                  <span>
+                    {loc.formattedDateTime ||
+                      loc.formattedTime ||
+                      new Date(loc.time).toLocaleString("es-CR")}
+                  </span>
                 </div>
-                {loc.felt && (
+                {loc.felt && loc.felt > 0 && (
                   <div className="flex items-center gap-1">
                     <span>
                       {t("feels")}: {loc.felt}
@@ -109,7 +100,8 @@ export function SeismicMap({
                 )}
                 <div className="flex items-center gap-1">
                   <span>
-                    {t("depth")}: {loc.depth} {t("km")}
+                    {t("depth")}:{" "}
+                    {loc.depth ? `${loc.depth} ${t("km")}` : t("unknown")}
                   </span>
                 </div>
               </div>
@@ -132,7 +124,10 @@ export function SeismicMap({
                   {t("celsius")}
                 </div>
                 <div>
-                  {t("lastEruption")}: {formatDateTime(loc.lastEruption)}
+                  {t("lastEruption")}:{" "}
+                  {loc.formattedDateTime ||
+                    loc.formattedTime ||
+                    new Date(loc.lastEruption).toLocaleString("es-CR")}
                 </div>
               </div>
             </>
