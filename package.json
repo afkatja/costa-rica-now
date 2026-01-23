@@ -76,6 +76,7 @@
   },
   "scripts": {
     "dev": "next dev --experimental-https",
-    "build": "next build"
+    "build": "next build",
+    "tscheck": "tsc --noEmit -p tsconfig.json"
   }
 }

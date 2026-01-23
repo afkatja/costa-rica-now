@@ -17,8 +17,8 @@ import { useGeolocation } from "../hooks/use-geolocation"
 import Earthquakes from "./Earthquakes"
 import Volcanoes from "./Volcanoes"
 
-export const formatDateTime = (timeString: string) => {
-  return new Date(timeString).toLocaleString("es-CR", {
+export const formatDateTime = (time: string | number | Date) => {
+  return new Date(time).toLocaleString("es-CR", {
     year: "numeric",
     month: "short",
     day: "numeric",
