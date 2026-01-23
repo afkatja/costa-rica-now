@@ -1,4 +1,5 @@
 import React from "react"
+import { useTranslations } from "next-intl"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import {
   Activity,
@@ -7,40 +8,10 @@ import {
   Thermometer,
   Loader2,
 } from "lucide-react"
-import { formatDateTime } from "./SeismicPage"
+import { ERUPTION_TIME_CODES, Volcano } from "../types/volcano"
 
-const Volcanoes = ({
-  volcanoes,
-}: {
-  volcanoes: {
-    id: number
-    name: string
-    details: {}
-    subDetails: {}
-    history: []
-  }[]
-}) => {
-  const getEruptTime = (year: string) => {
-    switch (year) {
-      case "D1":
-        return ">= 1964"
-      case "D2":
-        return "1900 - 1963"
-      case "D3":
-        return "1800 - 1899"
-      case "D4":
-        return "1700 - 1799"
-      case "D5":
-        return "1500 - 1699"
-      case "D6":
-        return "1 - 1499"
-      case "D7":
-        return "Holcene"
-      default:
-        return "Unknown"
-    }
-  }
-
+const Volcanoes = ({ volcanoes }: { volcanoes: Volcano[] }) => {
+  const  t  = useTranslations("Volcanos")
   const getVolcanoStatusColor = (status: string) => {
     switch (status) {
       case "Activo":
@@ -54,6 +25,31 @@ const Volcanoes = ({
     }
   }
 
+  // Calculate statistics
+  const activeVolcanoes = volcanoes.filter(volcano => {
+    const status =
+      (volcano as any).computedStatus ||
+      volcano.details["Status"] ||
+      "Durmiente"
+    return status === "Activo"
+  }).length
+
+  const dormantVolcanoes = volcanoes.filter(volcano => {
+    const status =
+      (volcano as any).computedStatus ||
+      volcano.details["Status"] ||
+      "Durmiente"
+    return status === "Durmiente"
+  }).length
+
+  const extinctVolcanoes = volcanoes.filter(volcano => {
+    const status =
+      (volcano as any).computedStatus ||
+      volcano.details["Status"] ||
+      "Durmiente"
+    return status === "Extinto"
+  }).length
+
   console.log({ volcanoes })
 
   return (
@@ -64,9 +60,9 @@ const Volcanoes = ({
             <div className="flex items-center gap-2">
               <Mountain className="h-5 w-5 text-red-500" />
               <div>
-                <div className="text-2xl font-medium"></div>
+                <div className="text-2xl font-medium">{activeVolcanoes}</div>
                 <div className="text-sm text-muted-foreground">
-                  Volcanes activos
+                  {t("active")}
                 </div>
               </div>
             </div>
@@ -76,7 +72,13 @@ const Volcanoes = ({
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              <AlertTriangle className="h-5 w-5 text-blue-500" />
+              <div>
+                <div className="text-2xl font-medium">{dormantVolcanoes}</div>
+                <div className="text-sm text-muted-foreground">
+                  {t("dormant")}
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -84,7 +86,13 @@ const Volcanoes = ({
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Thermometer className="h-5 w-5 text-yellow-500" />
+              <Thermometer className="h-5 w-5 text-gray-500" />
+              <div>
+                <div className="text-2xl font-medium">{extinctVolcanoes}</div>
+                <div className="text-sm text-muted-foreground">
+                  {t("extinct")}
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -93,7 +101,7 @@ const Volcanoes = ({
       {/* Volcano Activity */}
       <Card>
         <CardHeader>
-          <CardTitle>Actividad Volcánica</CardTitle>
+          <CardTitle>{t("activity")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -105,7 +113,11 @@ const Volcanoes = ({
                     <div>
                       <h4 className="font-medium">{volcano.name}</h4>
                       <div className="text-sm text-muted-foreground">
-                        Elevación: {volcano.subDetails.SummitElevation} m
+                        {t("elevation")}:{" "}
+                        {volcano.subDetails["Summit Elevation"] ||
+                          volcano.subDetails["Elevation"] ||
+                          "N/A"}{" "}
+                        m
                       </div>
                     </div>
                   </div>
@@ -115,17 +127,28 @@ const Volcanoes = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Estado:</span>
+                      <span className="text-sm font-medium">
+                        {t("status")}:
+                      </span>
                       <span
                         className={`text-sm ${getVolcanoStatusColor(
-                          attributes.STATUS
+                          (volcano as any).computedStatus ||
+                            volcano.details["Status"] ||
+                            "Durmiente"
                         )}`}
                       >
-                        {attributes.STATUS}
+                        {(volcano as any).computedStatus ||
+                          volcano.details["Status"] ||
+                          "Durmiente"}
                       </span>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Última erupción: {getEruptTime(attributes.TIME_ERUPT)}
+                      {t("lastEruption")}:{" "}
+                      {
+                        ERUPTION_TIME_CODES[
+                          (volcano as any).computedEruptionTime || "D1"
+                        ].range
+                      }
                     </div>
                   </div>
 

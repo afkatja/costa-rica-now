@@ -19,6 +19,7 @@ import Volcanoes from "./Volcanoes"
 import { useTranslations } from "next-intl"
 import { SeismicEvent, SeismicDataResponse } from "../types/seismic"
 import { TimeFilter, SourceFilter } from "../types/filters"
+import { Volcano, VolcanoesResponse } from "../types/volcano"
 
 export function SeismicPage() {
   const t = useTranslations("SeismicPage")
@@ -32,7 +33,7 @@ export function SeismicPage() {
   >(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
-  const [volcanoes, setVolcanoes] = useState<any[]>([])
+  const [volcanoes, setVolcanoes] = useState<Volcano[]>([])
   const [volcanoLoading, setVolcanoLoading] = useState(false)
   const [volcanoError, setVolcanoError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"earthquakes" | "volcanoes">(
@@ -143,18 +144,26 @@ export function SeismicPage() {
     try {
       setVolcanoLoading(true)
       setVolcanoError(null)
+
       const response = await supabase.functions.invoke("volcanic-service", {
         body: {
           country: "Costa Rica",
           timeCode: "D1",
         },
       })
-      console.log({ volcanos: response.data.volcanoes })
 
-      setVolcanoes(response.data.volcanoes)
+      if (!response.data?.success) {
+        throw new Error(response.data?.error || "Failed to fetch volcano data")
+      }
+
+      const volcanoData = response.data as VolcanoesResponse
+      console.log({ volcanos: volcanoData.volcanoes })
+
+      setVolcanoes(volcanoData.volcanoes)
     } catch (error) {
       console.error("Error fetching volcanic data", error)
       setVolcanoError(error instanceof Error ? error.message : "Unknown error")
+      setVolcanoes([]) // Reset to empty array on error
     } finally {
       setVolcanoLoading(false)
     }

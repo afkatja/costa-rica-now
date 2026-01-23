@@ -8,6 +8,15 @@ const nextConfig = {
     taint: true,
     optimizePackageImports: ["gsap", "lucide-react"],
   },
+  webpack: config => {
+    config.module.rules.push({
+      test: /\/supabase\/functions\//,
+      loader: "null-loader",
+      type: "javascript/auto",
+    })
+    return config
+  },
+
   images: {
     qualities: [50, 75, 100],
     remotePatterns: [

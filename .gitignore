@@ -16,3 +16,4 @@ tsconfig.tsbuildinfo
 supabase/.temp
 .vercel
 .env*.local
+.DS_Store

@@ -62,6 +62,7 @@
     "title": "Seismic and Volcanic Activity",
     "mapTitle": "Map of Seismic and Volcanic Activity",
     "loading": "Loading seismic data...",
+    "volcanosLoading": "Loading volcanic data...",
     "error": "Failed to load seismic data",
     "retry": "Retry",
     "recentEarthquakes": "Recent Earthquakes",
@@ -131,5 +132,25 @@
     "filteredResults": "Filtered results",
     "noFilteredResults": "No results match the current filters",
     "loading": "Loading earthquakes..."
+  },
+  "Volcanos": {
+    "active": "Active",
+    "dormant": "Dormant",
+    "extinct": "Extinct",
+    "lastEruption": "Last Eruption",
+    "unknown": "Unknown",
+    "elevation": "Elevation",
+    "activity": "Activity",
+    "volcanoes": "Volcanoes",
+    "status": "Status",
+    "eruptionTimeCodes": {
+      "AD": "After 1900 AD",
+      "BD": "Before 1900 AD",
+      "D": "During Historic Time",
+      "H": "Historic (within last 600 years)",
+      "HO": "Holocene (within last 10,000 years)",
+      "Q": "Quaternary (within last 2.6 million years)",
+      "U": "Unknown"
+    }
   }
 }
