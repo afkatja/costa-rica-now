@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
         .map(k => k.trim())
         .filter(Boolean),
     icons: {
-      icon: "/favicon/icon.ico",
+      icon: "/favicon/favicon.ico",
       apple: "/favicon/apple-touch-icon.png",
       shortcut: "/favicon/safari-pinned-tab.svg",
     },

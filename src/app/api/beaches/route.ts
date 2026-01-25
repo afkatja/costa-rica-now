@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { coastalDestinations } from "@/lib/shared/destinations"
 
+export const dynamic = "force-dynamic"
+
 // Types
 type TideExtreme = {
   time: string
@@ -48,7 +50,7 @@ async function fetchTides(lat: number, lon: number) {
         headers: {
           "x-marea-api-token": process.env.MAREA_API_KEY!,
         },
-      }
+      },
     )
 
     if (!response.ok) {
@@ -75,7 +77,7 @@ async function fetchWaves(lat: number, lon: number) {
     })
 
     const response = await fetch(
-      `https://marine-api.open-meteo.com/v1/marine?${params}`
+      `https://marine-api.open-meteo.com/v1/marine?${params}`,
     )
 
     if (!response.ok) {
@@ -176,7 +178,7 @@ function processWaveData(waveData: any) {
 
 // Determine surf conditions based on wave height
 function getSurfConditions(
-  waveHeight: number
+  waveHeight: number,
 ): "excellent" | "good" | "fair" | "poor" {
   if (waveHeight >= 1.0 && waveHeight <= 2.5) return "excellent"
   if (waveHeight >= 0.7 && waveHeight < 1.0) return "good"
@@ -188,6 +190,8 @@ function getSurfConditions(
 
 export async function GET(request: NextRequest) {
   try {
+    console.log("Request URL:", request.url)
+    console.log("Request method:", request.method)
     const { searchParams } = new URL(request.url)
     const destinationId = searchParams.get("destination")
 
@@ -197,7 +201,7 @@ export async function GET(request: NextRequest) {
       if (!destination) {
         return NextResponse.json(
           { error: "Destination not found" },
-          { status: 404 }
+          { status: 404 },
         )
       }
 
@@ -260,7 +264,7 @@ export async function GET(request: NextRequest) {
             console.error(`Error fetching data for ${destination.name}:`, error)
             return null
           }
-        })
+        }),
       )
       allConditions.push(...batchResults)
     }
@@ -276,7 +280,7 @@ export async function GET(request: NextRequest) {
     console.error("Error in beach conditions API:", error)
     return NextResponse.json(
       { error: "Internal server error", details: error.message },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

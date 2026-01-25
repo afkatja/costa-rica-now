@@ -21,6 +21,16 @@ import { SeismicEvent, SeismicDataResponse } from "../types/seismic"
 import { TimeFilter, SourceFilter } from "../types/filters"
 import { Volcano, VolcanoesResponse } from "../types/volcano"
 
+export const formatDateTime = (time: string | number | Date) => {
+  return new Date(time).toLocaleString("es-CR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 export function SeismicPage() {
   const t = useTranslations("SeismicPage")
   const [loading, setLoading] = useState(false)
@@ -37,13 +47,13 @@ export function SeismicPage() {
   const [volcanoLoading, setVolcanoLoading] = useState(false)
   const [volcanoError, setVolcanoError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"earthquakes" | "volcanoes">(
-    "earthquakes"
+    "earthquakes",
   )
   // Filter states
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(TimeFilter.All)
   const [magnitudeFilter, setMagnitudeFilter] = useState(false)
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>(
-    SourceFilter.All
+    SourceFilter.All,
   )
   const [locationFilter, setLocationFilter] = useState(false)
 

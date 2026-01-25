@@ -1,1 +1,70 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140"><ellipse cx="50" cy="135" fill="rgba(0,0,0,0.2)" rx="20" ry="5"/><path fill="url(#a)" stroke="#1a5f3f" stroke-width="2" d="M50 10c-20 0-35 15-35 35 0 25 35 75 35 75s35-50 35-75c0-20-15-35-35-35Z"/><defs><linearGradient id="a" x1="0%" x2="0%" y1="0%" y2="100%"><stop offset="0%" style="stop-color:#2d9f6f;stop-opacity:1"/><stop offset="100%" style="stop-color:#1a7a52;stop-opacity:1"/></linearGradient><linearGradient id="b" x1="0%" x2="0%" y1="0%" y2="100%"><stop offset="0%" style="stop-color:#4fb3bf;stop-opacity:1"/><stop offset="100%" style="stop-color:#2d8da0;stop-opacity:1"/></linearGradient></defs><circle cx="50" cy="45" r="24" fill="#fff"/><g transform="translate(50 45)"><path fill="#2d9f6f" d="M-15-8q3-4 5 0l-1 6Z"/><path fill="#3bb77f" d="M-12-6q2-4 4-1l-1 5Z"/><path fill="#1a5f3f" d="m-8 2 6-12L4 2Z"/><path fill="#2d7a5f" d="M2 2 8-8l6 10Z"/><path fill="url(#b)" d="M-18 6q3-2 6 0t6 0 6 0 6 0 6 0 6 0v4h-36Z"/><circle cx="-4" cy="-4" r="1.5" fill="#fff" opacity=".8"/><circle cx="-2" cy="-4" r="1.5" fill="#fff" opacity=".8"/><circle cx="10" cy="-2" r="1.5" fill="#fff" opacity=".8"/><circle cx="12" cy="-2" r="1.5" fill="#fff" opacity=".8"/></g><circle cx="50" cy="45" r="24" fill="none" stroke="#2d9f6f" stroke-width="1.5" opacity=".6"><animate attributeName="r" dur="2s" repeatCount="indefinite" values="24;28;24"/><animate attributeName="opacity" dur="2s" repeatCount="indefinite" values="0.6;0;0.6"/></circle></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 72.37 114.04">
+  <!-- Generator: Adobe Illustrator 29.5.1, SVG Export Plug-In . SVG Version: 2.1.0 Build 141)  -->
+  <defs>
+    <style>
+      .st0, .st1 {
+        fill: none;
+      }
+
+      .st2 {
+        fill: #2d7a5f;
+      }
+
+      .st3 {
+        fill: url(#linear-gradient1);
+      }
+
+      .st4 {
+        fill: #1a5f3f;
+      }
+
+      .st5 {
+        fill: url(#linear-gradient);
+        stroke: #1a5f3f;
+        stroke-width: 2px;
+      }
+
+      .st1 {
+        isolation: isolate;
+        opacity: .6;
+        stroke: #2d9f6f;
+        stroke-width: 1.5px;
+      }
+
+      .st6 {
+        clip-path: url(#clippath);
+      }
+    </style>
+    <linearGradient id="linear-gradient" x1="36.25" y1="1050.33" x2="36.25" y2="940.33" gradientTransform="translate(0 -938)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2d9f6f"/>
+      <stop offset="1" stop-color="#1a7a52"/>
+    </linearGradient>
+    <clipPath id="clippath">
+      <circle class="st0" cx="36.25" cy="36.53" r="24">
+        <animate accumulate="none" additive="replace" attributeName="r" calcMode="linear" dur="2s" fill="remove" repeatCount="indefinite" restart="always" values="24;28;24"/>
+        <animate accumulate="none" additive="replace" attributeName="opacity" calcMode="linear" dur="2s" fill="remove" repeatCount="indefinite" restart="always" values="0.6;0;0.6"/>
+      </circle>
+    </clipPath>
+    <linearGradient id="linear-gradient1" x1="-4432.74" y1="133.23" x2="-4432.74" y2="131.97" gradientTransform="translate(159614.42 709.18) scale(36 -5)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4fb3bf"/>
+      <stop offset="1" stop-color="#2d8da0"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <path class="st5" d="M36.25,1.53C16.25,1.53,1.25,16.53,1.25,36.53c0,25,35,75,35,75,0,0,35-50,35-75C71.25,16.53,56.25,1.53,36.25,1.53ZM36.25,12.53c13.25,0,24,10.75,24,24s-10.75,24-24,24-24-10.75-24-24,10.75-24,24-24Z"/>
+    <circle class="st1" cx="36.25" cy="36.53" r="24">
+      <animate accumulate="none" additive="replace" attributeName="r" calcMode="linear" dur="2s" fill="remove" repeatCount="indefinite" restart="always" values="24;28;24"/>
+      <animate accumulate="none" additive="replace" attributeName="opacity" calcMode="linear" dur="2s" fill="remove" repeatCount="indefinite" restart="always" values="0.6;0;0.6"/>
+    </circle>
+  </g>
+  <g class="st6">
+    <g>
+      <g>
+        <path class="st4" d="M18.07,39.07l9.92-19.83,9.92,19.83h-19.85Z"/>
+        <path class="st2" d="M34.59,39.07l9.92-16.53,9.92,16.53h-19.85Z"/>
+      </g>
+      <path class="st3" d="M13.24,44.3c2.51-1.67,5.01-1.67,7.52,0s5.01,1.67,7.52,0,5.01-1.67,7.52,0,5.01,1.67,7.52,0,5.01-1.67,7.52,0,5.01,1.67,7.52,0v5.01H13.24s0-5.01,0-5.01Z"/>
+    </g>
+  </g>
+</svg>
