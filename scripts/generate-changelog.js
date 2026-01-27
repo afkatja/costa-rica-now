@@ -1,0 +1,296 @@
+#!/usr/bin/env node
+
+/**
+ * Automatic Changelog Generator
+ *
+ * This script generates changelog entries based on conventional commit messages.
+ * Commit message format: <type>: <description>
+ *
+ * Types:
+ * - feat: A new feature
+ * - fix: A bug fix
+ * - chore: Maintenance tasks
+ * - docs: Documentation only changes
+ * - style: Code style changes (formatting, etc.)
+ * - refactor: Code refactoring
+ * - test: Adding or updating tests
+ * - perf: Performance improvements
+ *
+ * Usage:
+ *   node scripts/generate-changelog.js [options]
+ *
+ * Options:
+ *   --since <tag>     Generate changelog since specific tag (default: last tag)
+ *   --to <tag>        Generate changelog up to specific tag (default: HEAD)
+ *   --output <file>   Output file (default: CHANGELOG.md)
+ *   --dry-run         Print to console without writing to file
+ */
+
+const { execSync } = require("child_process")
+const fs = require("fs")
+const path = require("path")
+
+// Configuration
+const COMMIT_TYPES = {
+  feat: { title: "### Added", priority: 1 },
+  fix: { title: "### Fixed", priority: 2 },
+  perf: { title: "### Performance", priority: 3 },
+  refactor: { title: "### Changed", priority: 4 },
+  test: { title: "### Testing", priority: 5 },
+  docs: { title: "### Documentation", priority: 6 },
+  chore: { title: "### Maintenance", priority: 7 },
+  style: { title: "### Style", priority: 8 },
+}
+
+const IGNORED_COMMIT_PATTERNS = [
+  /^Merge branch/,
+  /^Merge pull request/,
+  /^Revert/,
+  /^WIP:/,
+  /^ci:/,
+  /^build:/,
+]
+
+// Parse command line arguments
+function parseArgs() {
+  const args = process.argv.slice(2)
+  const options = {
+    since: null,
+    to: "HEAD",
+    output: "CHANGELOG.md",
+    dryRun: false,
+  }
+
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case "--since":
+        options.since = args[++i]
+        break
+      case "--to":
+        options.to = args[++i]
+        break
+      case "--output":
+        options.output = args[++i]
+        break
+      case "--dry-run":
+        options.dryRun = true
+        break
+      case "--help":
+      case "-h":
+        printHelp()
+        process.exit(0)
+        break
+    }
+  }
+
+  return options
+}
+
+function printHelp() {
+  console.log(`
+Automatic Changelog Generator
+
+Usage: node scripts/generate-changelog.js [options]
+
+Options:
+  --since <tag>     Generate changelog since specific tag (default: last tag)
+  --to <tag>        Generate changelog up to specific tag (default: HEAD)
+  --output <file>   Output file (default: CHANGELOG.md)
+  --dry-run         Print to console without writing to file
+  --help, -h        Show this help message
+
+Examples:
+  node scripts/generate-changelog.js
+  node scripts/generate-changelog.js --since v1.0.0 --to v1.1.0
+  node scripts/generate-changelog.js --dry-run
+`)
+}
+
+// Get the last tag
+function getLastTag() {
+  try {
+    return execSync("git describe --tags --abbrev=0 2>/dev/null", {
+      encoding: "utf-8",
+    }).trim()
+  } catch {
+    return null
+  }
+}
+
+// Get commits between two references
+function getCommits(since, to) {
+  const range = since ? `${since}..${to}` : to
+  const format = "%H|%s|%b|%an|%ad"
+
+  try {
+    const output = execSync(
+      `git log ${range} --pretty=format:"${format}" --no-merges`,
+      { encoding: "utf-8" },
+    )
+
+    if (!output.trim()) {
+      return []
+    }
+
+    return output.split("\n").map(line => {
+      const [hash, subject, body, author, date] = line.split("|")
+      return { hash, subject, body, author, date }
+    })
+  } catch (error) {
+    console.error("Error fetching commits:", error.message)
+    return []
+  }
+}
+
+// Parse commit message
+function parseCommit(commit) {
+  const match = commit.subject.match(/^(\w+)(?:\(([^)]+)\))?:\s*(.+)$/)
+
+  if (!match) {
+    return null
+  }
+
+  const [, type, scope, description] = match
+
+  // Check if type is recognized
+  if (!COMMIT_TYPES[type]) {
+    return null
+  }
+
+  // Check if commit should be ignored
+  for (const pattern of IGNORED_COMMIT_PATTERNS) {
+    if (pattern.test(commit.subject)) {
+      return null
+    }
+  }
+
+  return {
+    type,
+    scope,
+    description,
+    hash: commit.hash.slice(0, 7),
+    author: commit.author,
+    date: commit.date,
+  }
+}
+
+// Group commits by type
+function groupCommits(commits) {
+  const groups = {}
+
+  for (const commit of commits) {
+    const parsed = parseCommit(commit)
+    if (!parsed) continue
+
+    if (!groups[parsed.type]) {
+      groups[parsed.type] = []
+    }
+
+    groups[parsed.type].push(parsed)
+  }
+
+  return groups
+}
+
+// Generate changelog entry
+function generateChangelogEntry(groups, since, to) {
+  const date = new Date().toISOString().split("T")[0]
+  const version = to === "HEAD" ? "[Unreleased]" : to
+
+  let entry = `## ${version} - ${date}\n\n`
+
+  // Sort types by priority
+  const sortedTypes = Object.keys(groups).sort((a, b) => {
+    return COMMIT_TYPES[a].priority - COMMIT_TYPES[b].priority
+  })
+
+  for (const type of sortedTypes) {
+    const commits = groups[type]
+    const { title } = COMMIT_TYPES[type]
+
+    entry += `${title}\n`
+
+    for (const commit of commits) {
+      const scope = commit.scope ? `**${commit.scope}:** ` : ""
+      entry += `- ${scope}${commit.description} (${commit.hash})\n`
+    }
+
+    entry += "\n"
+  }
+
+  return entry
+}
+
+// Update CHANGELOG.md file
+function updateChangelogFile(entry, outputPath, dryRun) {
+  const changelogPath = path.resolve(outputPath)
+
+  if (dryRun) {
+    console.log("=== Generated Changelog Entry ===\n")
+    console.log(entry)
+    return
+  }
+
+  let content = ""
+
+  if (fs.existsSync(changelogPath)) {
+    content = fs.readFileSync(changelogPath, "utf-8")
+
+    // Find the position after the header
+    const headerMatch = content.match(/^(# Changelog[\s\S]*?)(## |$)/)
+    if (headerMatch) {
+      const headerEnd = headerMatch[0].length
+      content =
+        content.slice(0, headerEnd) + "\n" + entry + content.slice(headerEnd)
+    } else {
+      content = "# Changelog\n\n" + entry + content
+    }
+  } else {
+    content = `# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+${entry}`
+  }
+
+  fs.writeFileSync(changelogPath, content)
+  console.log(`✅ Changelog updated: ${outputPath}`)
+}
+
+// Main function
+function main() {
+  const options = parseArgs()
+
+  // Determine range
+  const since = options.since || getLastTag()
+  const to = options.to
+
+  console.log(`Generating changelog from ${since || "beginning"} to ${to}...\n`)
+
+  // Get commits
+  const commits = getCommits(since, to)
+
+  if (commits.length === 0) {
+    console.log("No commits found in the specified range.")
+    return
+  }
+
+  console.log(`Found ${commits.length} commits\n`)
+
+  // Group and generate
+  const groups = groupCommits(commits)
+  const entry = generateChangelogEntry(groups, since, to)
+
+  // Update file
+  updateChangelogFile(entry, options.output, options.dryRun)
+}
+
+// Run if called directly
+if (require.main === module) {
+  main()
+}
+
+module.exports = { generateChangelogEntry, parseCommit, groupCommits }
