@@ -106,14 +106,25 @@ function determineVolcanoStatus(volcano: Volcano): string {
     return "Activo"
   }
 
-  // Check recent eruption history
+  // Check recent eruption history using dynamic rolling window
+  const ACTIVE_YEARS_WINDOW = 5 // Configurable: number of years to consider as "recent"
+  const cutoffDate = new Date()
+  cutoffDate.setFullYear(cutoffDate.getFullYear() - ACTIVE_YEARS_WINDOW)
+
   const recentEruptions = volcano.history.filter(event => {
-    const dateStr = event.date.toLowerCase()
-    return (
-      dateStr.includes("2020") ||
-      dateStr.includes("2019") ||
-      dateStr.includes("2018")
-    )
+    try {
+      // Robust date parsing: handle various formats (YYYY, YYYY-MM, YYYY-MM-DD, etc.)
+      const eventDate = parseEventDate(event.date)
+      if (!eventDate) {
+        // Skip invalid dates gracefully
+        return false
+      }
+      return eventDate >= cutoffDate
+    } catch (error) {
+      // Log parse failures and skip invalid dates
+      console.warn(`Failed to parse eruption date "${event.date}":`, error)
+      return false
+    }
   })
 
   if (recentEruptions.length > 0) {
@@ -121,6 +132,36 @@ function determineVolcanoStatus(volcano: Volcano): string {
   }
 
   return "Durmiente" // Default status
+}
+
+/**
+ * Robustly parse various date formats from eruption history
+ * Handles: YYYY, YYYY-MM, YYYY-MM-DD, and other common formats
+ */
+function parseEventDate(dateStr: string): Date | null {
+  if (!dateStr || typeof dateStr !== "string") {
+    return null
+  }
+
+  // Extract year from the date string (handles various formats)
+  const yearMatch = dateStr.match(/(\d{4})/)
+  if (!yearMatch) {
+    return null
+  }
+
+  const year = parseInt(yearMatch[1], 10)
+  if (isNaN(year) || year < 1000 || year > 9999) {
+    return null
+  }
+
+  // Try to parse as full date first
+  const parsedDate = new Date(dateStr)
+  if (!isNaN(parsedDate.getTime())) {
+    return parsedDate
+  }
+
+  // Fallback: create date from year only (set to January 1st)
+  return new Date(year, 0, 1)
 }
 ```
 
@@ -184,12 +225,12 @@ volcano.subDetails["Summit Elevation"] ||
   volcano.subDetails["Elevation"] ||
   "N/A"(
     // For status
-    volcano as any
+    volcano as any,
   ).computedStatus ||
   volcano.details["Status"] ||
   "Durmiente"(
     // For eruption time
-    volcano as any
+    volcano as any,
   ).computedEruptionTime ||
   "D1"
 ```
