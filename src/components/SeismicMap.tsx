@@ -52,7 +52,7 @@ export function SeismicMap({
   const pins = locations.map(loc => {
     const isEarthquake = type === "earthquake"
     const lat = loc.coordinates?.lat || loc.lat
-    const lng = loc.coordinates?.lon || loc.lng
+    const lng = loc.coordinates?.lon || loc.lon || loc.lng
     const name = isEarthquake ? loc.location : loc.name
     const markerColor = isEarthquake
       ? getMagnitudeColorScheme(loc.magnitude)
