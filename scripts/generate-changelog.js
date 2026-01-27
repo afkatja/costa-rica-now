@@ -120,7 +120,8 @@ function getLastTag() {
 // Get commits between two references
 function getCommits(since, to) {
   const range = since ? `${since}..${to}` : to
-  const format = "%H|%s|%b|%an|%ad"
+  // Use non-printable separators: %x1F (field separator) and %x1E (record separator)
+  const format = "%H%x1F%s%x1F%b%x1F%an%x1F%ad%x1E"
 
   try {
     const output = execSync(
@@ -132,10 +133,13 @@ function getCommits(since, to) {
       return []
     }
 
-    return output.split("\n").map(line => {
-      const [hash, subject, body, author, date] = line.split("|")
-      return { hash, subject, body, author, date }
-    })
+    return output
+      .split("\x1E")
+      .filter(record => record.trim() !== "")
+      .map(record => {
+        const [hash, subject, body, author, date] = record.split("\x1F")
+        return { hash, subject, body, author, date }
+      })
   } catch (error) {
     console.error("Error fetching commits:", error.message)
     return []
