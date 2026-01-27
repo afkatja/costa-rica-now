@@ -136,11 +136,12 @@ const Volcanoes = ({ volcanoes }: { volcanoes: Volcano[] }) => {
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {t("lastEruption")}:{" "}
-                      {
-                        ERUPTION_TIME_CODES[
-                          volcano.computedEruptionTime || "D1"
-                        ].range
-                      }
+                      {(() => {
+                        const key = volcano.computedEruptionTime || "D1"
+                        const entry =
+                          ERUPTION_TIME_CODES[key] || ERUPTION_TIME_CODES["D1"]
+                        return entry?.range || "Unknown"
+                      })()}
                     </div>
                   </div>
 
