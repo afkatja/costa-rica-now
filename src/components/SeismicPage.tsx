@@ -141,6 +141,17 @@ export function SeismicPage() {
         body: requestBody,
       })
 
+      if (response.error) {
+        console.error("Supabase function error:", response.error)
+        setError(response.error.message || "Failed to fetch seismic data")
+        return
+      }
+
+      if (!response.data) {
+        setError("No data received from seismic service")
+        return
+      }
+
       setEarthquakes(response.data.events)
       setTotalEarthquakes(response.data.metadata.stats.total)
       setEarthquakeStats(response.data.metadata.stats)
