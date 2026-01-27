@@ -83,7 +83,7 @@ export function SeismicPage() {
       setEarthquakesLoading(true)
       setError(null)
 
-      // const offset = (page - 1) * itemsPerPage
+      const offset = (page - 1) * itemsPerPage
       const now = new Date()
       const timeRanges: Record<string, number> = {
         [TimeFilter.Last24Hours]: 24 * 60 * 60 * 1000,
@@ -117,8 +117,8 @@ export function SeismicPage() {
         startDate,
         endDate,
         type: "earthquake",
-        // limit: itemsPerPage,
-        // offset,
+        limit: itemsPerPage,
+        offset,
       }
 
       // Add filters to request

@@ -259,10 +259,9 @@ const Earthquakes = ({
     ? earthquakes
     : earthquakes?.slice(0, filteredTotalCount) || []
   const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedEarthquakes = (displayEarthquakes || []).slice(
-    startIndex,
-    startIndex + itemsPerPage,
-  )
+  const paginatedEarthquakes = isServerSideFiltered
+    ? displayEarthquakes || []
+    : (displayEarthquakes || []).slice(startIndex, startIndex + itemsPerPage)
 
   // Generate pagination pages with ellipsis
   const getPaginationPages = () => {
