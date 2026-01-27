@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { SeismicMap } from "./SeismicMap"
-import { mockSeismicData } from "../utils/mockSeismicData"
 import {
   Activity,
   AlertTriangle,
@@ -11,9 +10,10 @@ import {
   Thermometer,
   Loader2,
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { supabase } from "../utils/supabase/client"
 import { useGeolocation } from "../hooks/use-geolocation"
+import { useDebounce } from "../hooks/use-debounce"
 import Earthquakes from "./Earthquakes"
 import Volcanoes from "./Volcanoes"
 import { useTranslations } from "next-intl"
@@ -57,12 +57,17 @@ export function SeismicPage() {
   )
   const [locationFilter, setLocationFilter] = useState(false)
 
+  // Debounce filter values to prevent excessive API calls
+  const debouncedTimeFilter = useDebounce(timeFilter, 300)
+  const debouncedMagnitudeFilter = useDebounce(magnitudeFilter, 300)
+  const debouncedSourceFilter = useDebounce(sourceFilter, 300)
+  const debouncedLocationFilter = useDebounce(locationFilter, 300)
+
   const {
     position,
     loading: geoLoading,
     error: geoError,
     requestLocation,
-    // isInCostaRica,
   } = useGeolocation()
 
   // Request location permission on mount
@@ -70,7 +75,6 @@ export function SeismicPage() {
     if (!position && !geoLoading && !geoError) {
       requestLocation()
     }
-    // if (geoError) setError(geoError)
   }, [position, geoLoading, geoError, requestLocation])
 
   const fetchSeismicData = async (page: number = 1, filters?: any) => {
@@ -167,8 +171,6 @@ export function SeismicPage() {
       }
 
       const volcanoData = response.data as VolcanoesResponse
-      console.log({ volcanos: volcanoData.volcanoes })
-
       setVolcanoes(volcanoData.volcanoes)
     } catch (error) {
       console.error("Error fetching volcanic data", error)
@@ -190,12 +192,24 @@ export function SeismicPage() {
     fetchSeismicData(1, filters) // Reset to page 1 when filters change
   }
 
-  // Watch for filter changes and refetch data
+  // Watch for debounced filter changes and refetch data
   useEffect(() => {
     if (activeTab === "earthquakes") {
-      handleFilterChange()
+      const filters = {
+        timeFilter: debouncedTimeFilter,
+        magnitudeFilter: debouncedMagnitudeFilter,
+        sourceFilter: debouncedSourceFilter,
+        locationFilter: debouncedLocationFilter,
+      }
+      fetchSeismicData(1, filters)
     }
-  }, [timeFilter, magnitudeFilter, sourceFilter, locationFilter, activeTab])
+  }, [
+    debouncedTimeFilter,
+    debouncedMagnitudeFilter,
+    debouncedSourceFilter,
+    debouncedLocationFilter,
+    activeTab,
+  ])
 
   // Request location permission and fetch seismic data on mount
   useEffect(() => {
@@ -302,7 +316,7 @@ export function SeismicPage() {
           {/* Volcanoes Map */}
           <Card>
             <CardHeader>
-              <CardTitle>Mapa de Actividad Volcánica</CardTitle>
+              <CardTitle>{t("volcanicMapTitle")}</CardTitle>
             </CardHeader>
             <CardContent>
               {volcanoLoading ? (

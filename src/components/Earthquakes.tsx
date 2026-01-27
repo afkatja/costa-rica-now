@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, memo } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
@@ -65,6 +65,77 @@ interface EarthquakesProps {
   requestLocation?: () => void
 }
 
+// Memoized individual earthquake item to prevent unnecessary re-renders
+interface EarthquakeItemProps {
+  earthquake: SeismicEvent
+  getMagnitudeColor: (magnitude: number) => string
+  getMagnitudeBadge: (
+    magnitude: number,
+  ) => "default" | "secondary" | "destructive" | "outline"
+  t: (key: string, values?: Record<string, string | number>) => string
+}
+
+const EarthquakeItem = memo(function EarthquakeItem({
+  earthquake,
+  getMagnitudeColor,
+  getMagnitudeBadge,
+  t,
+}: EarthquakeItemProps) {
+  return (
+    <div key={earthquake.id} className="border rounded-lg p-4">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Badge
+            variant={getMagnitudeBadge(earthquake.magnitude)}
+            className={getMagnitudeColor(earthquake.magnitude)}
+          >
+            M {earthquake.magnitude}
+          </Badge>
+          {earthquake.felt && earthquake.felt > 0 && (
+            <Badge variant="outline" className="text-xs">
+              {t("felt")} {earthquake.felt}
+            </Badge>
+          )}
+        </div>
+        {earthquake.url && (
+          <div className="text-sm text-muted-foreground">
+            <a
+              href={earthquake.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              {t("source")}: {earthquake.source}
+            </a>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 text-sm">
+          <MapPin className="h-4 w-4 text-muted-foreground" />
+          {earthquake.location}
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="h-4 w-4" />
+          {earthquake.formattedDateTime ||
+            earthquake.formattedTime ||
+            new Date(earthquake.time).toLocaleString("es-CR")}
+        </div>
+        <div className="text-sm text-muted-foreground">
+          {t("depth")}:{" "}
+          {earthquake.depth ? `${earthquake.depth} km` : t("unknown")}
+        </div>
+        {earthquake.status && (
+          <div className="text-sm text-muted-foreground">
+            {t("status")}: {earthquake.status}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+})
+
 const Earthquakes = ({
   earthquakes,
   totalCount,
@@ -82,16 +153,16 @@ const Earthquakes = ({
 
   // Use filter props if provided, otherwise fall back to local state for backwards compatibility
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(
-    filters?.timeFilter || TimeFilter.All
+    filters?.timeFilter || TimeFilter.All,
   )
   const [magnitudeFilter, setMagnitudeFilter] = useState(
-    filters?.magnitudeFilter || false
+    filters?.magnitudeFilter || false,
   )
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>(
-    filters?.sourceFilter || SourceFilter.All
+    filters?.sourceFilter || SourceFilter.All,
   )
   const [locationFilter, setLocationFilter] = useState(
-    filters?.locationFilter || false
+    filters?.locationFilter || false,
   )
 
   // Sync with props when they change
@@ -190,7 +261,7 @@ const Earthquakes = ({
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedEarthquakes = (displayEarthquakes || []).slice(
     startIndex,
-    startIndex + itemsPerPage
+    startIndex + itemsPerPage,
   )
 
   // Generate pagination pages with ellipsis
@@ -411,12 +482,10 @@ const Earthquakes = ({
               <div className="flex flex-wrap gap-2">
                 {timeFilter !== TimeFilter.All && (
                   <Badge variant="secondary">
-                    {timeFilter === TimeFilter.Last24Hours &&
-                      t(TimeFilter.Last24Hours)}
-                    {timeFilter === TimeFilter.Last3Days &&
-                      t(TimeFilter.Last3Days)}
-                    {timeFilter === TimeFilter.Week && t(TimeFilter.Week)}
-                    {timeFilter === TimeFilter.Month && t(TimeFilter.Month)}
+                    {timeFilter === TimeFilter.Last24Hours && t("24h")}
+                    {timeFilter === TimeFilter.Last3Days && t("3d")}
+                    {timeFilter === TimeFilter.Week && t("week")}
+                    {timeFilter === TimeFilter.Month && t("month")}
                     <X
                       className="h-3 w-3 ml-1 cursor-pointer"
                       onClick={() => handleTimeFilterChange(TimeFilter.All)}
@@ -469,59 +538,13 @@ const Earthquakes = ({
           ) : (
             <div className="space-y-4">
               {paginatedEarthquakes?.map((earthquake: SeismicEvent) => (
-                <div key={earthquake.id} className="border rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={getMagnitudeBadge(earthquake.magnitude)}
-                        className={getMagnitudeColor(earthquake.magnitude)}
-                      >
-                        M {earthquake.magnitude}
-                      </Badge>
-                      {earthquake.felt && earthquake.felt > 0 && (
-                        <Badge variant="outline" className="text-xs">
-                          {t("felt")} {earthquake.felt}
-                        </Badge>
-                      )}
-                    </div>
-                    {earthquake.url && (
-                      <div className="text-sm text-muted-foreground">
-                        <a
-                          href={earthquake.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          {t("source")}: {earthquake.source}
-                        </a>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      {earthquake.location}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      {earthquake.formattedDateTime ||
-                        earthquake.formattedTime ||
-                        new Date(earthquake.time).toLocaleString("es-CR")}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {t("depth")}:{" "}
-                      {earthquake.depth
-                        ? `${earthquake.depth} km`
-                        : t("unknown")}
-                    </div>
-                    {earthquake.status && (
-                      <div className="text-sm text-muted-foreground">
-                        {t("status")}: {earthquake.status}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <EarthquakeItem
+                  key={earthquake.id}
+                  earthquake={earthquake}
+                  getMagnitudeColor={getMagnitudeColor}
+                  getMagnitudeBadge={getMagnitudeBadge}
+                  t={t}
+                />
               ))}
             </div>
           )}

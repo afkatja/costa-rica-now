@@ -72,7 +72,8 @@
     "usgsEarthquakeApi": "USGS Earthquake API",
     "usgsVolcanoApi": "USGS Volcano API",
     "realTimeAlerts": "Real-time alerts",
-    "interactiveMaps": "Interactive maps"
+    "interactiveMaps": "Interactive maps",
+    "volcanicMapTitle": "Volcanic Activity Map"
   },
   "SeismicMap": {
     "noData": "No data",
@@ -96,7 +97,9 @@
     "temperature": "Temp",
     "celsius": "°C",
     "unknown": "Unknown",
-    "lastEruption": "Last eruption"
+    "lastEruption": "Last eruption",
+    "status": "Status",
+    "elevation": "Elevation"
   },
   "Earthquakes": {
     "noData": "No data",

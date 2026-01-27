@@ -113,21 +113,20 @@ export function SeismicMap({
                   className="w-4 h-4 rounded-full"
                   style={{ backgroundColor: colorPoint }}
                 />
-                <p className="text-lg font-bold">{loc.status}</p>
+                <p className="text-lg font-bold">{loc.name}</p>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   {t("alert")}: {loc.alertLevel}
                 </div>
                 <div>
-                  {t("temperature")}: {loc.temperature}
-                  {t("celsius")}
+                  {t("status")}: {loc.computedStatus}
                 </div>
                 <div>
-                  {t("lastEruption")}:{" "}
-                  {loc.formattedDateTime ||
-                    loc.formattedTime ||
-                    new Date(loc.lastEruption).toLocaleString("es-CR")}
+                  {t("elevation")}: {loc.elevation}
+                </div>
+                <div>
+                  {t("lastEruption")}: {loc.computedEruptionTime}
                 </div>
               </div>
             </>

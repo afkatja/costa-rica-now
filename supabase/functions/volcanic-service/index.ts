@@ -1,4 +1,8 @@
-import { COSTA_RICA_VOLCANOES, isWithinCostaRica } from "../_shared/coords.ts"
+import {
+  COSTA_RICA_VOLCANOES,
+  VOLCANO_COORDINATES,
+  isWithinCostaRica,
+} from "../_shared/coords.ts"
 import { corsHeaders } from "../_shared/cors.ts"
 import { DOMParser } from "https://deno.land/x/deno_dom/deno-dom-wasm.ts"
 
@@ -44,7 +48,7 @@ const ERUPTION_TIME_CODES: Record<string, { label: string; range: string }> = {
 
 async function scrapeVolcanoData(
   volcanoId: string,
-  volcanoName: string
+  volcanoName: string,
 ): Promise<Volcano | null> {
   try {
     const url = `https://volcano.si.edu/volcano.cfm?vn=${volcanoId}`
@@ -110,7 +114,7 @@ async function scrapeVolcanoData(
         const historyTable = section.querySelector(".Eruption-Accordion")
         if (historyTable) {
           const rows = historyTable.querySelectorAll(
-            ".Eruption-AccordionHeader"
+            ".Eruption-AccordionHeader",
           )
 
           for (const row of rows) {
@@ -135,7 +139,7 @@ async function scrapeVolcanoData(
 // Filter volcanoes based on time code
 function filterVolcanoesByTimeCode(
   volcanoes: Volcano[],
-  timeCode?: string
+  timeCode?: string,
 ): Volcano[] {
   if (!timeCode || timeCode === "D1") {
     return volcanoes // Return all volcanoes for D1 (most recent) or no filter
@@ -175,31 +179,50 @@ Deno.serve(async (req: Request) => {
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       )
     }
 
     // Scrape volcano data for all Costa Rica volcanoes
     const volcanoPromises = Object.entries(COSTA_RICA_VOLCANOES).map(
-      ([name, id]) => scrapeVolcanoData(id, name)
+      ([name, id]) => scrapeVolcanoData(id, name),
     )
 
     let volcanoes = (await Promise.all(volcanoPromises)).filter(
-      Boolean
+      Boolean,
     ) as Volcano[]
 
     // Apply time code filtering if specified
     volcanoes = filterVolcanoesByTimeCode(volcanoes, timeCode)
 
     // Enhance volcano data with computed properties for client compatibility
-    const enhancedVolcanoes = volcanoes.map(volcano => ({
-      ...volcano,
-      // Add computed properties that the client expects
-      computedStatus: determineVolcanoStatus(volcano),
-      computedEruptionTime: timeCode
-        ? ERUPTION_TIME_CODES[timeCode]?.range
-        : "Unknown",
-    }))
+    const enhancedVolcanoes = volcanoes.map(volcano => {
+      const coords = VOLCANO_COORDINATES[volcano.id]
+      const status = determineVolcanoStatus(volcano)
+
+      // Map status to alert level for display
+      let alertLevel = "Verde"
+      if (status === "Activo") alertLevel = "Roja"
+      else if (status === "Durmiente") alertLevel = "Amarilla"
+
+      return {
+        ...volcano,
+        // Add coordinates for map display
+        lat: coords?.lat || 0,
+        lng: coords?.lng || 0,
+        // Add computed properties that the client expects
+        computedStatus: status,
+        computedEruptionTime: timeCode
+          ? ERUPTION_TIME_CODES[timeCode]?.range
+          : "Unknown",
+        // Add map display properties
+        alertLevel,
+        elevation:
+          volcano.subDetails["Summit Elevation"] ||
+          volcano.subDetails["Elevation"] ||
+          "Unknown",
+      }
+    })
 
     const response = {
       success: true,
@@ -231,7 +254,7 @@ Deno.serve(async (req: Request) => {
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     )
   }
 })

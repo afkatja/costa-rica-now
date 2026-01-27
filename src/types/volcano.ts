@@ -21,6 +21,15 @@ export interface Volcano {
   details: VolcanoDetails
   subDetails: VolcanoSubDetails
   history: VolcanoEruptionEvent[]
+  // Coordinates for map display
+  lat: number
+  lng: number
+  // Computed properties added by the server for client convenience
+  computedStatus?: string
+  computedEruptionTime?: string
+  // Map display properties
+  alertLevel?: string
+  elevation?: string
 }
 
 export interface VolcanoesResponse {

@@ -11,7 +11,7 @@ import {
 import { ERUPTION_TIME_CODES, Volcano } from "../types/volcano"
 
 const Volcanoes = ({ volcanoes }: { volcanoes: Volcano[] }) => {
-  const  t  = useTranslations("Volcanos")
+  const t = useTranslations("Volcanoes")
   const getVolcanoStatusColor = (status: string) => {
     switch (status) {
       case "Activo":
@@ -28,29 +28,21 @@ const Volcanoes = ({ volcanoes }: { volcanoes: Volcano[] }) => {
   // Calculate statistics
   const activeVolcanoes = volcanoes.filter(volcano => {
     const status =
-      (volcano as any).computedStatus ||
-      volcano.details["Status"] ||
-      "Durmiente"
+      volcano.computedStatus || volcano.details["Status"] || "Durmiente"
     return status === "Activo"
   }).length
 
   const dormantVolcanoes = volcanoes.filter(volcano => {
     const status =
-      (volcano as any).computedStatus ||
-      volcano.details["Status"] ||
-      "Durmiente"
+      volcano.computedStatus || volcano.details["Status"] || "Durmiente"
     return status === "Durmiente"
   }).length
 
   const extinctVolcanoes = volcanoes.filter(volcano => {
     const status =
-      (volcano as any).computedStatus ||
-      volcano.details["Status"] ||
-      "Durmiente"
+      volcano.computedStatus || volcano.details["Status"] || "Durmiente"
     return status === "Extinto"
   }).length
-
-  console.log({ volcanoes })
 
   return (
     <>
@@ -132,12 +124,12 @@ const Volcanoes = ({ volcanoes }: { volcanoes: Volcano[] }) => {
                       </span>
                       <span
                         className={`text-sm ${getVolcanoStatusColor(
-                          (volcano as any).computedStatus ||
+                          volcano.computedStatus ||
                             volcano.details["Status"] ||
-                            "Durmiente"
+                            "Durmiente",
                         )}`}
                       >
-                        {(volcano as any).computedStatus ||
+                        {volcano.computedStatus ||
                           volcano.details["Status"] ||
                           "Durmiente"}
                       </span>
@@ -146,7 +138,7 @@ const Volcanoes = ({ volcanoes }: { volcanoes: Volcano[] }) => {
                       {t("lastEruption")}:{" "}
                       {
                         ERUPTION_TIME_CODES[
-                          (volcano as any).computedEruptionTime || "D1"
+                          volcano.computedEruptionTime || "D1"
                         ].range
                       }
                     </div>
