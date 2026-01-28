@@ -367,7 +367,8 @@ Deno.serve(async (req: Request) => {
 // Helper function to determine volcano status based on available data
 function determineVolcanoStatus(volcano: Volcano): string {
   // Check if volcano is marked as active in details
-  if (volcano.details["Status"]?.toLowerCase().includes("active")) {
+  const statusText = volcano.details["Status"]?.toLowerCase() ?? ""
+ if (/\bactive\b/.test(statusText)) {
     return "Activo"
   }
 
