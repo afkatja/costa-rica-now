@@ -64,12 +64,27 @@ function parseArgs() {
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
       case "--since":
+        if (!args[i + 1] || args[i + 1].startsWith("-")) {
+          console.error("Error: --since requires a tag argument")
+          printHelp()
+          process.exit(1)
+        }
         options.since = args[++i]
         break
       case "--to":
+        if (!args[i + 1] || args[i + 1].startsWith("-")) {
+          console.error("Error: --to requires a tag argument")
+          printHelp()
+          process.exit(1)
+        }
         options.to = args[++i]
         break
       case "--output":
+        if (!args[i + 1] || args[i + 1].startsWith("-")) {
+          console.error("Error: --output requires a file argument")
+          printHelp()
+          process.exit(1)
+        }
         options.output = args[++i]
         break
       case "--dry-run":
