@@ -635,9 +635,7 @@ Deno.serve(async (req: Request) => {
 
     const filteredEvents = filterEventsByDateRange(
       allEvents,
-      hasFilters
-        ? (adjustedParams.startDate as string)
-        : (params.startDate as string),
+      params.startDate as string,
       params.endDate as string,
     )
 
