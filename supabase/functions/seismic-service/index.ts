@@ -16,11 +16,19 @@ function formatDateTime(timestamp: number): string {
   })
 }
 
+// Helper function to format time only for Costa Rica locale
+function formatTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleString("es-CR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 // Helper function to add formatted fields to SeismicEvent
 function addFormattedFields(event: SeismicEvent): SeismicEvent {
   return {
     ...event,
-    formattedTime: formatDateTime(event.time),
+    formattedTime: formatTime(event.time),
     formattedDateTime: formatDateTime(event.time),
   }
 }
