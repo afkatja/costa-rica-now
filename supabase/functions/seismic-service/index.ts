@@ -28,7 +28,7 @@ function addFormattedFields(event: SeismicEvent): SeismicEvent {
 const normalizeOvsicori = (quake: any): SeismicEvent => ({
   id: `ovsicori-${quake["Fecha y Hora Local"].replace(
     /\D/g,
-    ""
+    "",
   )}-${quake.lat.toFixed(3)}-${quake.lon.toFixed(3)}`,
   source: "ovsicori" as const,
   magnitude: parseFloat(quake.Magnitud),
@@ -126,7 +126,7 @@ async function fetchUSGSData(params: FetchParams): Promise<SeismicEvent[]> {
       tsunami: feature.properties.tsunami === 1,
       url: feature.properties.url,
       status: feature.properties.status,
-    })
+    }),
   )
 }
 
@@ -203,121 +203,114 @@ async function fetchOVSICORIData(params: FetchParams): Promise<SeismicEvent[]> {
 async function fetchRSNData(params: FetchParams): Promise<SeismicEvent[]> {
   const { startDate, endDate, minMagnitude = 2.5, maxMagnitude } = params
 
-  // Test with different date ranges to isolate the issue
-  const testRanges = [
-    { startDate: "2025-11-01", endDate: "2025-12-31", name: "last_month" },
-    { startDate, endDate, name: "requested_range" },
-  ]
+  console.log(
+    `\n=== Fetching RSN data for requested range: ${startDate} to ${endDate} ===`,
+  )
 
-  for (const range of testRanges) {
-    console.log(
-      `\n=== Testing RSN data for ${range.name}: ${range.startDate} to ${range.endDate} ===`
-    )
+  const queryParams = new URLSearchParams({
+    starttime: startDate,
+    endtime: endDate,
+    minlatitude: COSTA_RICA_BOUNDS.minLatitude.toString(),
+    maxlatitude: COSTA_RICA_BOUNDS.maxLatitude.toString(),
+    minlongitude: COSTA_RICA_BOUNDS.minLongitude.toString(),
+    maxlongitude: COSTA_RICA_BOUNDS.maxLongitude.toString(),
+    minmagnitude: minMagnitude.toString(),
+  })
 
-    const queryParams = new URLSearchParams({
-      starttime: range.startDate,
-      endtime: range.endDate,
-      minlatitude: COSTA_RICA_BOUNDS.minLatitude.toString(),
-      maxlatitude: COSTA_RICA_BOUNDS.maxLatitude.toString(),
-      minlongitude: COSTA_RICA_BOUNDS.minLongitude.toString(),
-      maxlongitude: COSTA_RICA_BOUNDS.maxLongitude.toString(),
-      minmagnitude: minMagnitude.toString(),
-    })
-
-    if (maxMagnitude !== undefined) {
-      queryParams.append("maxmagnitude", maxMagnitude.toString())
-    }
-
-    const url = `https://www.isc.ac.uk/fdsnws/event/1/query?${queryParams.toString()}`
-
-    try {
-      // Try multiple request configurations
-      const requestConfigs: Array<{
-        name: string
-        headers: Record<string, string>
-        redirect: RequestRedirect
-      }> = [
-        {
-          name: "Browser-like headers",
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            Accept:
-              "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Accept-Encoding": "gzip, deflate, br",
-            Connection: "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "Cache-Control": "no-cache",
-          },
-          redirect: "follow",
-        },
-        {
-          name: "Minimal headers",
-          headers: {
-            "User-Agent": "Mozilla/5.0 (compatible)",
-          },
-          redirect: "follow",
-        },
-        {
-          name: "Current Edge Function headers",
-          headers: {
-            "User-Agent": "Mozilla/5.0 (compatible; SeismicService/1.0)",
-            Accept: "application/xml, text/xml, */*",
-            "Accept-Language": "en-US,en;q=0.9",
-          },
-          redirect: "follow",
-        },
-      ]
-
-      for (const config of requestConfigs) {
-        console.log(`\n--- Testing with ${config.name} ---`)
-
-        const response = await fetch(url, {
-          method: "GET",
-          headers: config.headers,
-          redirect: config.redirect,
-        })
-
-        console.log(
-          `Response status: ${response.status} ${response.statusText}`
-        )
-        console.log(`Response URL: ${response.url}`)
-        console.log(`Redirected: ${response.redirected}`)
-        console.log(
-          "Response headers:",
-          Object.fromEntries(response.headers.entries())
-        )
-
-        if (response.status === 200) {
-          const xmlText = await response.text()
-          console.log(`Response length: ${xmlText.length} characters`)
-          console.log("Response preview:", xmlText.substring(0, 500))
-
-          if (
-            xmlText.length > 0 &&
-            (xmlText.includes("<isc") || xmlText.includes("<?xml"))
-          ) {
-            console.log(`✅ SUCCESS: Got XML data with ${config.name}`)
-            return await parseRSNXML(xmlText, range.startDate, range.endDate)
-          } else {
-            console.log(`⚠️  Response is not XML or is empty`)
-          }
-        } else if (response.status === 204) {
-          console.log(`⚠️  204 No Content with ${config.name}`)
-        } else {
-          console.log(`❌ Error ${response.status} with ${config.name}`)
-        }
-
-        // Small delay between requests
-        await new Promise(resolve => setTimeout(resolve, 100))
-      }
-    } catch (error) {
-      console.error(`Error testing ${range.name}:`, error)
-    }
+  if (maxMagnitude !== undefined) {
+    queryParams.append("maxmagnitude", maxMagnitude.toString())
   }
 
-  console.log("❌ All RSN tests failed - returning empty array")
+  const url = `https://www.isc.ac.uk/fdsnws/event/1/query?${queryParams.toString()}`
+
+  try {
+    // Try multiple request configurations
+    const requestConfigs: Array<{
+      name: string
+      headers: Record<string, string>
+      redirect: RequestRedirect
+    }> = [
+      {
+        name: "Browser-like headers",
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.5",
+          "Accept-Encoding": "gzip, deflate, br",
+          Connection: "keep-alive",
+          "Upgrade-Insecure-Requests": "1",
+          "Cache-Control": "no-cache",
+        },
+        redirect: "follow",
+      },
+      {
+        name: "Minimal headers",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible)",
+        },
+        redirect: "follow",
+      },
+      {
+        name: "Current Edge Function headers",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; SeismicService/1.0)",
+          Accept: "application/xml, text/xml, */*",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        redirect: "follow",
+      },
+    ]
+
+    for (const config of requestConfigs) {
+      console.log(`\n--- Testing with ${config.name} ---`)
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: config.headers,
+        redirect: config.redirect,
+      })
+
+      console.log(`Response status: ${response.status} ${response.statusText}`)
+      console.log(`Response URL: ${response.url}`)
+      console.log(`Redirected: ${response.redirected}`)
+      console.log(
+        "Response headers:",
+        Object.fromEntries(response.headers.entries()),
+      )
+
+      if (response.status === 200) {
+        const xmlText = await response.text()
+        console.log(`Response length: ${xmlText.length} characters`)
+        console.log("Response preview:", xmlText.substring(0, 500))
+
+        if (
+          xmlText.length > 0 &&
+          (xmlText.includes("<isc") || xmlText.includes("<?xml"))
+        ) {
+          console.log(`✅ SUCCESS: Got XML data with ${config.name}`)
+          return await parseRSNXML(xmlText, startDate, endDate)
+        } else {
+          console.log(`⚠️  Response is not XML or is empty`)
+        }
+      } else if (response.status === 204) {
+        console.log(`⚠️  204 No Content with ${config.name}`)
+      } else {
+        console.log(`❌ Error ${response.status} with ${config.name}`)
+      }
+
+      // Small delay between requests
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+  } catch (error) {
+    console.error(
+      `Error fetching RSN data for range ${startDate} to ${endDate}:`,
+      error,
+    )
+  }
+
+  console.log("❌ All RSN requests failed - returning empty array")
   return []
 }
 
@@ -325,7 +318,7 @@ async function fetchRSNData(params: FetchParams): Promise<SeismicEvent[]> {
 async function parseRSNXML(
   xmlText: string,
   startDate: string,
-  endDate: string
+  endDate: string,
 ): Promise<SeismicEvent[]> {
   console.log("Parsing RSN XML data...")
 
@@ -340,7 +333,7 @@ async function parseRSNXML(
 
     // Extract preferred origin data
     const preferredOriginMatch = eventXml.match(
-      /<origin[^>]*preferred="true"[^>]*>([\s\S]*?)<\/origin>/i
+      /<origin[^>]*preferred="true"[^>]*>([\s\S]*?)<\/origin>/i,
     )
     const originMatch =
       preferredOriginMatch ||
@@ -356,25 +349,25 @@ async function parseRSNXML(
 
       // Extract time
       const timeMatch = originXml.match(
-        /<time[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i
+        /<time[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i,
       )
       timeStr = timeMatch ? timeMatch[1].trim() : ""
 
       // Extract latitude
       const latMatch = originXml.match(
-        /<latitude[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i
+        /<latitude[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i,
       )
       lat = latMatch ? parseFloat(latMatch[1].trim()) : 0
 
       // Extract longitude
       const lonMatch = originXml.match(
-        /<longitude[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i
+        /<longitude[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i,
       )
       lon = lonMatch ? parseFloat(lonMatch[1].trim()) : 0
 
       // Extract depth
       const depthMatch = originXml.match(
-        /<depth[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i
+        /<depth[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i,
       )
       depth = depthMatch ? parseFloat(depthMatch[1].trim()) : null
     }
@@ -383,7 +376,7 @@ async function parseRSNXML(
 
     // Extract preferred magnitude
     const preferredMagMatch = eventXml.match(
-      /<magnitude[^>]*preferred="true"[^>]*>([\s\S]*?)<\/magnitude>/i
+      /<magnitude[^>]*preferred="true"[^>]*>([\s\S]*?)<\/magnitude>/i,
     )
     const magMatch =
       preferredMagMatch ||
@@ -392,14 +385,14 @@ async function parseRSNXML(
     let magnitude = 0
     if (magMatch) {
       const magValueMatch = magMatch[1].match(
-        /<mag[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i
+        /<mag[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i,
       )
       magnitude = magValueMatch ? parseFloat(magValueMatch[1].trim()) : 0
     }
 
     // Extract location description
     const descMatch = eventXml.match(
-      /<description[^>]*>[\s]*<text[^>]*>([^<]*)<\/text>/i
+      /<description[^>]*>[\s]*<text[^>]*>([^<]*)<\/text>/i,
     )
     const location = descMatch
       ? descMatch[1].trim()
@@ -414,7 +407,7 @@ async function parseRSNXML(
     creationInfoMatches.forEach(creationInfo => {
       const authorMatch = creationInfo.match(/<author[^>]*>([^<]*)<\/author>/i)
       const agencyMatch = creationInfo.match(
-        /<agencyID[^>]*>([^<]*)<\/agencyID>/i
+        /<agencyID[^>]*>([^<]*)<\/agencyID>/i,
       )
 
       if (authorMatch) networks.add(authorMatch[1].toLowerCase().trim())
@@ -521,7 +514,7 @@ function calculateDistance(
   lat1: number,
   lon1: number,
   lat2: number,
-  lon2: number
+  lon2: number,
 ): number {
   const R = 6371 // Radius of the Earth in kilometers
   const dLat = ((lat2 - lat1) * Math.PI) / 180
@@ -541,12 +534,12 @@ function filterEventsByLocation(
   events: SeismicEvent[],
   lat?: number,
   lon?: number,
-  radiusKm?: number
+  radiusKm?: number,
 ): SeismicEvent[] {
   if (!lat || !lon || !radiusKm) return events
 
   return events.filter(
-    event => calculateDistance(lat, lon, event.lat, event.lon) <= radiusKm
+    event => calculateDistance(lat, lon, event.lat, event.lon) <= radiusKm,
   )
 }
 
@@ -574,7 +567,7 @@ Deno.serve(async (req: Request) => {
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       )
     }
 
@@ -628,7 +621,7 @@ Deno.serve(async (req: Request) => {
     const filterEventsByDateRange = (
       events: SeismicEvent[],
       start?: string,
-      end?: string
+      end?: string,
     ) => {
       if (!start && !end) return events
 
@@ -645,7 +638,7 @@ Deno.serve(async (req: Request) => {
       hasFilters
         ? (adjustedParams.startDate as string)
         : (params.startDate as string),
-      params.endDate as string
+      params.endDate as string,
     )
 
     // Filter events by magnitude range
@@ -662,7 +655,7 @@ Deno.serve(async (req: Request) => {
       magnitudeFilteredEvents,
       params.lat,
       params.lon,
-      params.radiusKm
+      params.radiusKm,
     )
 
     // If source filter is applied, return all events from that source (no deduplication)
@@ -670,7 +663,7 @@ Deno.serve(async (req: Request) => {
     let processedEvents: SeismicEvent[]
     if (params.source) {
       processedEvents = locationFilteredEvents.filter(
-        event => event.source === params.source
+        event => event.source === params.source,
       )
     } else {
       // Deduplicate when no specific source is requested
@@ -680,7 +673,7 @@ Deno.serve(async (req: Request) => {
     const sortedEvents = sortEvents(processedEvents)
     console.log({
       mEvents: allEvents.filter(
-        ({ source }: { source: string }) => source.toLowerCase() === "rsn"
+        ({ source }: { source: string }) => source.toLowerCase() === "rsn",
       ),
       rsnEvents,
     })
@@ -750,7 +743,7 @@ Deno.serve(async (req: Request) => {
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     )
   } catch (error) {
     console.error("Service error:", error)
@@ -764,7 +757,7 @@ Deno.serve(async (req: Request) => {
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     )
   }
 })
