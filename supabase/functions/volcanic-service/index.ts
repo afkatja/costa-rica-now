@@ -316,9 +316,10 @@ Deno.serve(async (req: Request) => {
           lng: coords.lng,
           // Add computed properties that the client expects
           computedStatus: status,
-          computedEruptionTime: timeCode
-            ? ERUPTION_TIME_CODES[timeCode]?.range
-            : "Unknown",
+          computedEruptionTime:
+            timeCode && ERUPTION_TIME_CODES[timeCode]
+              ? ERUPTION_TIME_CODES[timeCode]?.range
+              : "Unknown",
           // Add map display properties
           alertLevel,
           elevation:
@@ -410,7 +411,7 @@ function parseEventDate(dateStr: string): Date | null {
   }
 
   // Extract year from the date string (handles 1-4 digit years)
-  const yearMatch = dateStr.match(/(\d{1,4})/)
+  const yearMatch = dateStr.match(/(\d{4})/) ?? dateStr.match(/\b(\d{1,3})\b/)
   if (!yearMatch) {
     return null
   }
