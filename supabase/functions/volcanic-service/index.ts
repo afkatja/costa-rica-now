@@ -1,10 +1,6 @@
-import {
-  COSTA_RICA_VOLCANOES,
-  VOLCANO_COORDINATES,
-  isWithinCostaRica,
-} from "../_shared/coords.ts"
+import { COSTA_RICA_VOLCANOES, VOLCANO_COORDINATES } from "../_shared/coords.ts"
 import { corsHeaders } from "../_shared/cors.ts"
-import { DOMParser } from "https://deno.land/x/deno_dom/deno-dom-wasm.ts"
+import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.56/deno-dom-wasm.ts"
 
 // Type definitions for volcano data contract
 interface VolcanoEruptionEvent {
