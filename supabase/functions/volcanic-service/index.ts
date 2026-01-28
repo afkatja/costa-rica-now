@@ -48,8 +48,33 @@ async function scrapeVolcanoData(
 ): Promise<Volcano | null> {
   try {
     const url = `https://volcano.si.edu/volcano.cfm?vn=${volcanoId}`
-    // Fetch the main volcano page
-    const response = await fetch(url)
+
+    // Create AbortController for timeout handling
+    const controller = new AbortController()
+    const timeoutMs = 10000 // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+    let response: Response
+    try {
+      // Fetch the main volcano page with timeout
+      response = await fetch(url, { signal: controller.signal })
+    } catch (fetchError) {
+      // Clear timeout on error
+      clearTimeout(timeoutId)
+
+      // Check if error is an abort error (timeout)
+      if (fetchError instanceof Error && fetchError.name === "AbortError") {
+        throw new Error(
+          `Request timeout for ${volcanoName} (${volcanoId}): request exceeded ${timeoutMs}ms`,
+        )
+      }
+
+      // Re-throw other fetch errors
+      throw fetchError
+    }
+
+    // Clear timeout after successful fetch
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
       throw new Error(`Failed to fetch ${volcanoName}: ${response.status}`)
