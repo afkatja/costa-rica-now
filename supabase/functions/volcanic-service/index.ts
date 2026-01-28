@@ -263,33 +263,44 @@ Deno.serve(async (req: Request) => {
     volcanoes = filterVolcanoesByTimeCode(volcanoes, timeCode)
 
     // Enhance volcano data with computed properties for client compatibility
-    const enhancedVolcanoes = volcanoes.map(volcano => {
-      const coords = VOLCANO_COORDINATES[volcano.id]
-      const status = determineVolcanoStatus(volcano)
+    const enhancedVolcanoes = volcanoes
+      .filter(volcano => {
+        const coords = VOLCANO_COORDINATES[volcano.id]
+        if (!coords) {
+          console.warn(
+            `Skipping volcano with missing coordinates: id="${volcano.id}", name="${volcano.name}". No entry found in VOLCANO_COORDINATES.`,
+          )
+          return false
+        }
+        return true
+      })
+      .map(volcano => {
+        const coords = VOLCANO_COORDINATES[volcano.id]
+        const status = determineVolcanoStatus(volcano)
 
-      // Map status to alert level for display
-      let alertLevel = "Verde"
-      if (status === "Activo") alertLevel = "Roja"
-      else if (status === "Durmiente") alertLevel = "Amarilla"
+        // Map status to alert level for display
+        let alertLevel = "Verde"
+        if (status === "Activo") alertLevel = "Roja"
+        else if (status === "Durmiente") alertLevel = "Amarilla"
 
-      return {
-        ...volcano,
-        // Add coordinates for map display
-        lat: coords?.lat || 0,
-        lng: coords?.lng || 0,
-        // Add computed properties that the client expects
-        computedStatus: status,
-        computedEruptionTime: timeCode
-          ? ERUPTION_TIME_CODES[timeCode]?.range
-          : "Unknown",
-        // Add map display properties
-        alertLevel,
-        elevation:
-          volcano.subDetails["Summit Elevation"] ||
-          volcano.subDetails["Elevation"] ||
-          "Unknown",
-      }
-    })
+        return {
+          ...volcano,
+          // Add coordinates for map display
+          lat: coords.lat,
+          lng: coords.lng,
+          // Add computed properties that the client expects
+          computedStatus: status,
+          computedEruptionTime: timeCode
+            ? ERUPTION_TIME_CODES[timeCode]?.range
+            : "Unknown",
+          // Add map display properties
+          alertLevel,
+          elevation:
+            volcano.subDetails["Summit Elevation"] ||
+            volcano.subDetails["Elevation"] ||
+            "Unknown",
+        }
+      })
 
     const response = {
       success: true,
