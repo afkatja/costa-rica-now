@@ -166,7 +166,8 @@ async function scrapeVolcanoData(
  * @returns Filtered array of volcanoes that have at least one eruption in the specified time range
  *
  * Behavior:
- * - timeCode === "D1" or undefined: Returns all volcanoes (no filter)
+ * - timeCode === undefined: Returns all volcanoes (no filter)
+ * - timeCode === "D1": Returns volcanoes with eruptions >= 1964
  * - timeCode === "D7" (Holocene): Returns volcanoes with any eruption history
  * - Unknown timeCode: Treated as no filter (returns all volcanoes) with a warning
  * - Other time codes: Returns volcanoes with at least one eruption in the specified year range
@@ -175,8 +176,8 @@ function filterVolcanoesByTimeCode(
   volcanoes: Volcano[],
   timeCode?: string,
 ): Volcano[] {
-  // Handle D1 (most recent) or no filter - return all volcanoes
-  if (!timeCode || timeCode === "D1") {
+  // Handle no filter - return all volcanoes
+  if (!timeCode) {
     return volcanoes
   }
 
@@ -401,20 +402,21 @@ function determineVolcanoStatus(volcano: Volcano): string {
 /**
  * Robustly parse various date formats from eruption history
  * Handles: YYYY, YYYY-MM, YYYY-MM-DD, and other common formats
+ * Supports 1-4 digit years (e.g., 1, 99, 999, 1999)
  */
 function parseEventDate(dateStr: string): Date | null {
   if (!dateStr || typeof dateStr !== "string") {
     return null
   }
 
-  // Extract year from the date string (handles various formats)
-  const yearMatch = dateStr.match(/(\d{4})/)
+  // Extract year from the date string (handles 1-4 digit years)
+  const yearMatch = dateStr.match(/(\d{1,4})/)
   if (!yearMatch) {
     return null
   }
 
   const year = parseInt(yearMatch[1], 10)
-  if (isNaN(year) || year < 1000 || year > 9999) {
+  if (isNaN(year) || year < 1 || year > 9999) {
     return null
   }
 
