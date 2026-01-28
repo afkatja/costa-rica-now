@@ -26,7 +26,7 @@
  *   --dry-run         Print to console without writing to file
  */
 
-const { execSync } = require("child_process")
+const { execFileSync } = require("child_process")
 const fs = require("fs")
 const path = require("path")
 
@@ -109,8 +109,9 @@ Examples:
 // Get the last tag
 function getLastTag() {
   try {
-    return execSync("git describe --tags --abbrev=0 2>/dev/null", {
+    return execFileSync("git", ["describe", "--tags", "--abbrev=0"], {
       encoding: "utf-8",
+      stdio: ["inherit", "pipe", "pipe"],
     }).trim()
   } catch {
     return null
@@ -124,9 +125,10 @@ function getCommits(since, to) {
   const format = "%H%x1F%s%x1F%b%x1F%an%x1F%ad%x1E"
 
   try {
-    const output = execSync(
-      `git log ${range} --pretty=format:"${format}" --no-merges`,
-      { encoding: "utf-8" },
+    const output = execFileSync(
+      "git",
+      ["log", range, "--pretty=format:" + format, "--no-merges"],
+      { encoding: "utf-8", stdio: ["inherit", "pipe", "pipe"] },
     )
 
     if (!output.trim()) {
@@ -168,6 +170,15 @@ function parseCommit(commit) {
     }
   }
 
+  // Check for BREAKING CHANGE: footer in the commit body
+  let breakingChanges = null
+  if (commit.body) {
+    const breakingMatch = commit.body.match(/BREAKING CHANGE:\s*(.+)/i)
+    if (breakingMatch) {
+      breakingChanges = breakingMatch[1].trim()
+    }
+  }
+
   return {
     type,
     scope,
@@ -175,7 +186,8 @@ function parseCommit(commit) {
     hash: commit.hash.slice(0, 7),
     author: commit.author,
     date: commit.date,
-    breaking: !!breakingMarker, // Track if this is a breaking change
+    breaking: !!breakingMarker || !!breakingChanges, // Track if this is a breaking change
+    breakingChanges, // Store the breaking change description if present
   }
 }
 
@@ -217,7 +229,13 @@ function generateChangelogEntry(groups, since, to) {
 
     for (const commit of commits) {
       const scope = commit.scope ? `**${commit.scope}:** ` : ""
-      entry += `- ${scope}${commit.description} (${commit.hash})\n`
+      const breakingMarker = commit.breaking ? " **[BREAKING]**" : ""
+      entry += `- ${scope}${commit.description}${breakingMarker} (${commit.hash})\n`
+
+      // Add breaking change description on the next line if present
+      if (commit.breakingChanges) {
+        entry += `  - ${commit.breakingChanges}\n`
+      }
     }
 
     entry += "\n"
