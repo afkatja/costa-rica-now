@@ -31,7 +31,7 @@
     "clouds": "Nubes",
     "forecast5Days": "Pronóstico 5 Días",
     "weatherMap": "Mapa del Clima",
-    "regionalWeather": "Clima por Regiones",
+    "regionalWeatherTitle": "Clima por Regiones",
     "rain": "lluvia",
     "weatherData": "Datos del Clima",
     "weatherDataDescription": "Conecte con OpenWeather API para datos meteorológicos en tiempo real, mapas de precipitación, radar y pronósticos detallados.",
@@ -146,10 +146,13 @@
     "activity": "Actividad",
     "status": "Estado",
     "eruptionTimeCodes": {
-      "unknown": "Desconocido",
-      "historical": "Histórico",
-      "holocene": "Holoceno",
-      "prehistoric": "Prehistórico"
+      "AD": "Después de 1900 d.C.",
+      "BD": "Antes de 1900 d.C.",
+      "D": "Durante el tiempo histórico",
+      "H": "Histórico (últimos 600 años)",
+      "HO": "Holoceno (últimos 10,000 años)",
+      "Q": "Cuaternario (últimos 2.6 millones de años)",
+      "U": "Desconocido"
     }
   }
 }
