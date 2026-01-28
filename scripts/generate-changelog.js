@@ -148,15 +148,15 @@ function getCommits(since, to) {
 
 // Parse commit message
 function parseCommit(commit) {
-  const match = commit.subject.match(/^(\w+)(?:\(([^)]+)\))?:\s*(.+)$/)
+  const match = commit.subject.match(/^(\w+)(?:\(([^)]+)\))?(!)?:\s*(.+)$/)
 
   if (!match) {
     return null
   }
 
-  const [, type, scope, description] = match
+  const [, type, scope, breakingMarker, description] = match
 
-  // Check if type is recognized
+  // Check if type is recognized (type is captured without the '!' marker)
   if (!COMMIT_TYPES[type]) {
     return null
   }
@@ -175,6 +175,7 @@ function parseCommit(commit) {
     hash: commit.hash.slice(0, 7),
     author: commit.author,
     date: commit.date,
+    breaking: !!breakingMarker, // Track if this is a breaking change
   }
 }
 
@@ -243,7 +244,7 @@ function updateChangelogFile(entry, outputPath, dryRun) {
     // Find the position after the header
     const headerMatch = content.match(/^(# Changelog[\s\S]*?)(## |$)/)
     if (headerMatch) {
-      const headerEnd = headerMatch[0].length
+      const headerEnd = headerMatch[1].length
       content =
         content.slice(0, headerEnd) + "\n" + entry + content.slice(headerEnd)
     } else {
