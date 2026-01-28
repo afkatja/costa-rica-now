@@ -645,7 +645,11 @@ Deno.serve(async (req: Request) => {
         params.minMagnitude !== undefined
           ? event.magnitude >= params.minMagnitude
           : true
-      return meetsMin
+      const meetsMax =
+        params.maxMagnitude !== undefined
+          ? event.magnitude <= params.maxMagnitude
+          : true
+      return meetsMin && meetsMax
     })
 
     // Apply location filtering if requested
