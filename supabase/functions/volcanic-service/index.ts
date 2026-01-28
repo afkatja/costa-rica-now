@@ -133,17 +133,88 @@ async function scrapeVolcanoData(
 }
 
 // Filter volcanoes based on time code
+/**
+ * Filters volcanoes by eruption time code.
+ *
+ * @param volcanoes - Array of volcano objects to filter
+ * @param timeCode - Time code from ERUPTION_TIME_CODES (e.g., "D1", "D2", etc.)
+ * @returns Filtered array of volcanoes that have at least one eruption in the specified time range
+ *
+ * Behavior:
+ * - timeCode === "D1" or undefined: Returns all volcanoes (no filter)
+ * - timeCode === "D7" (Holocene): Returns volcanoes with any eruption history
+ * - Unknown timeCode: Treated as no filter (returns all volcanoes) with a warning
+ * - Other time codes: Returns volcanoes with at least one eruption in the specified year range
+ */
 function filterVolcanoesByTimeCode(
   volcanoes: Volcano[],
   timeCode?: string,
 ): Volcano[] {
+  // Handle D1 (most recent) or no filter - return all volcanoes
   if (!timeCode || timeCode === "D1") {
-    return volcanoes // Return all volcanoes for D1 (most recent) or no filter
+    return volcanoes
   }
 
-  // For other time codes, we would implement filtering logic based on eruption history
-  // This is a placeholder - in a real implementation, you'd analyze the history data
-  return volcanoes
+  // Get the time code configuration
+  const timeCodeConfig = ERUPTION_TIME_CODES[timeCode]
+
+  // Treat unknown time codes as no filter (return all volcanoes)
+  if (!timeCodeConfig) {
+    console.warn(`Unknown timeCode: ${timeCode}, returning all volcanoes`)
+    return volcanoes
+  }
+
+  // Parse the range to get start and end years
+  const range = timeCodeConfig.range
+
+  // Handle D7 (Holocene) - this is a special case
+  if (range === "Holocene") {
+    // Holocene is approximately the last 11,700 years
+    // For practical purposes, we'll treat this as "any eruption in history"
+    return volcanoes.filter(volcano => volcano.history.length > 0)
+  }
+
+  // Parse ranges like ">= 1964", "1900 - 1963", etc.
+  let startYear: number | null = null
+  let endYear: number | null = null
+
+  if (range.startsWith(">=")) {
+    // Range like ">= 1964"
+    startYear = parseInt(range.replace(">=", "").trim(), 10)
+    endYear = null // No upper bound
+  } else if (range.includes("-")) {
+    // Range like "1900 - 1963"
+    const [start, end] = range.split("-").map(s => parseInt(s.trim(), 10))
+    startYear = start
+    endYear = end
+  }
+
+  // If we couldn't parse the range, return all volcanoes
+  if (startYear === null || isNaN(startYear)) {
+    console.warn(`Could not parse range for timeCode ${timeCode}: ${range}`)
+    return volcanoes
+  }
+
+  // Filter volcanoes based on eruption history
+  return volcanoes.filter(volcano => {
+    // Check if any eruption falls within the time range
+    return volcano.history.some(event => {
+      const eventDate = parseEventDate(event.date)
+      if (!eventDate) {
+        return false // Skip invalid dates
+      }
+
+      const eventYear = eventDate.getFullYear()
+
+      if (endYear === null) {
+        // Only lower bound (e.g., ">= 1964")
+        return eventYear >= startYear
+      } else {
+        // Both bounds (e.g., "1900 - 1963")
+        return eventYear >= startYear && eventYear <= endYear
+      }
+    })
+  })
 }
 
 Deno.serve(async (req: Request) => {
