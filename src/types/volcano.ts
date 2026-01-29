@@ -25,10 +25,10 @@ export interface Volcano {
   lat: number
   lng: number
   // Computed properties added by the server for client convenience
-  computedStatus?: string
+  computedStatus?: VolcanoStatus
   computedEruptionTime?: string
   // Map display properties
-  alertLevel?: string
+  alertLevel?: AlertLevel
   elevation?: string
 }
 
@@ -48,6 +48,9 @@ export interface VolcanoesRequest {
 
 // Status types for volcano activity
 export type VolcanoStatus = "Activo" | "Durmiente" | "Extinto"
+
+// Alert level types for volcano display
+export type AlertLevel = "Verde" | "Amarilla" | "Roja"
 
 // Time eruption codes
 export type EruptionTimeCode = "D1" | "D2" | "D3" | "D4" | "D5" | "D6" | "D7"

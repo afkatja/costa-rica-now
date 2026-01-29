@@ -5,6 +5,7 @@ import MapTooltipContent from "./MapTooltipContent"
 import GoogleMapsWrapper from "./GoogleMapsWrapper"
 import { useTranslations } from "next-intl"
 import { SeismicEvent } from "../types/seismic"
+import { AlertLevel } from "../types/volcano"
 
 type PinType = "earthquake" | "volcano"
 
@@ -23,12 +24,10 @@ const getMagnitudeColorScheme = (magnitude: number): ColorSet => {
   return baseColorScheme.default
 }
 
-const getVolcanoColorScheme = (alertLevel: string): ColorSet => {
+const getVolcanoColorScheme = (alertLevel: AlertLevel): ColorSet => {
   switch (alertLevel) {
     case "Roja":
       return baseColorScheme.alert
-    case "Naranja":
-      return baseColorScheme.warn
     case "Amarilla":
       return baseColorScheme.minor
     case "Verde":

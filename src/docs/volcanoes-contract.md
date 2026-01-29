@@ -100,7 +100,7 @@ The server enhances raw scraped data with computed properties:
 ### Status Determination Logic
 
 ```typescript
-function determineVolcanoStatus(volcano: Volcano): string {
+function determineVolcanoStatus(volcano: Volcano): VolcanoStatus {
   // Check explicit status in details
   if (volcano.details["Status"]?.toLowerCase().includes("active")) {
     return "Activo"

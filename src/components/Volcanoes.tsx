@@ -8,11 +8,11 @@ import {
   Thermometer,
   Loader2,
 } from "lucide-react"
-import { ERUPTION_TIME_CODES, Volcano } from "../types/volcano"
+import { ERUPTION_TIME_CODES, Volcano, VolcanoStatus } from "../types/volcano"
 
 const Volcanoes = ({ volcanoes }: { volcanoes: Volcano[] }) => {
   const t = useTranslations("Volcanoes")
-  const getVolcanoStatusColor = (status: string) => {
+  const getVolcanoStatusColor = (status: VolcanoStatus) => {
     switch (status) {
       case "Activo":
         return "text-orange-600"
@@ -27,20 +27,26 @@ const Volcanoes = ({ volcanoes }: { volcanoes: Volcano[] }) => {
 
   // Calculate statistics
   const activeVolcanoes = volcanoes.filter(volcano => {
-    const status =
-      volcano.computedStatus || volcano.details["Status"] || "Durmiente"
+    const status: VolcanoStatus =
+      volcano.computedStatus ||
+      (volcano.details["Status"] as VolcanoStatus) ||
+      "Durmiente"
     return status === "Activo"
   }).length
 
   const dormantVolcanoes = volcanoes.filter(volcano => {
-    const status =
-      volcano.computedStatus || volcano.details["Status"] || "Durmiente"
+    const status: VolcanoStatus =
+      volcano.computedStatus ||
+      (volcano.details["Status"] as VolcanoStatus) ||
+      "Durmiente"
     return status === "Durmiente"
   }).length
 
   const extinctVolcanoes = volcanoes.filter(volcano => {
-    const status =
-      volcano.computedStatus || volcano.details["Status"] || "Durmiente"
+    const status: VolcanoStatus =
+      volcano.computedStatus ||
+      (volcano.details["Status"] as VolcanoStatus) ||
+      "Durmiente"
     return status === "Extinto"
   }).length
 
@@ -125,7 +131,7 @@ const Volcanoes = ({ volcanoes }: { volcanoes: Volcano[] }) => {
                       <span
                         className={`text-sm ${getVolcanoStatusColor(
                           volcano.computedStatus ||
-                            volcano.details["Status"] ||
+                            (volcano.details["Status"] as VolcanoStatus) ||
                             "Durmiente",
                         )}`}
                       >

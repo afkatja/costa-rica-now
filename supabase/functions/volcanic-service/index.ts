@@ -17,6 +17,12 @@ interface VolcanoSubDetails {
   [key: string]: string
 }
 
+// Volcano status types - must match frontend types
+type VolcanoStatus = "Activo" | "Durmiente" | "Extinto"
+
+// Alert level types for volcano display
+type AlertLevel = "Verde" | "Amarilla" | "Roja"
+
 interface Volcano {
   id: string
   name: string
@@ -305,7 +311,7 @@ Deno.serve(async (req: Request) => {
         const status = determineVolcanoStatus(volcano)
 
         // Map status to alert level for display
-        let alertLevel = "Verde"
+        let alertLevel: AlertLevel = "Verde"
         if (status === "Activo") alertLevel = "Roja"
         else if (status === "Durmiente") alertLevel = "Amarilla"
 
@@ -365,10 +371,10 @@ Deno.serve(async (req: Request) => {
 })
 
 // Helper function to determine volcano status based on available data
-function determineVolcanoStatus(volcano: Volcano): string {
+function determineVolcanoStatus(volcano: Volcano): VolcanoStatus {
   // Check if volcano is marked as active in details
   const statusText = volcano.details["Status"]?.toLowerCase() ?? ""
- if (/\bactive\b/.test(statusText)) {
+  if (/\bactive\b/.test(statusText)) {
     return "Activo"
   }
 
