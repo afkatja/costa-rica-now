@@ -1,4 +1,5 @@
 import React from "react"
+import { useTranslations } from "next-intl"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import {
   Activity,
@@ -7,40 +8,11 @@ import {
   Thermometer,
   Loader2,
 } from "lucide-react"
-import { formatDateTime } from "./SeismicPage"
+import { ERUPTION_TIME_CODES, Volcano, VolcanoStatus } from "../types/volcano"
 
-const Volcanoes = ({ volcanoes }: { volcanoes: any[] }) => {
-  const getAlertLevelColor = (level: string) => {
-    switch (level) {
-      case "Roja":
-        return "bg-red-500"
-      case "Naranja":
-        return "bg-orange-500"
-      case "Amarilla":
-        return "bg-yellow-500"
-      case "Verde":
-        return "bg-green-500"
-      default:
-        return "bg-gray-500"
-    }
-  }
-
-    const getVolcanoColor = (alertLevel: string) => {
-      switch (alertLevel) {
-        case "Roja":
-          return "#dc2626"
-        case "Naranja":
-          return "#ea580c"
-        case "Amarilla":
-          return "#ca8a04"
-        case "Verde":
-          return "#16a34a"
-        default:
-          return "#6b7280"
-      }
-    }
-
-  const getVolcanoStatusColor = (status: string) => {
+const Volcanoes = ({ volcanoes }: { volcanoes: Volcano[] }) => {
+  const t = useTranslations("Volcanoes")
+  const getVolcanoStatusColor = (status: VolcanoStatus) => {
     switch (status) {
       case "Activo":
         return "text-orange-600"
@@ -53,6 +25,31 @@ const Volcanoes = ({ volcanoes }: { volcanoes: any[] }) => {
     }
   }
 
+  // Calculate statistics
+  const activeVolcanoes = volcanoes.filter(volcano => {
+    const status: VolcanoStatus =
+      volcano.computedStatus ||
+      (volcano.details["Status"] as VolcanoStatus) ||
+      "Durmiente"
+    return status === "Activo"
+  }).length
+
+  const dormantVolcanoes = volcanoes.filter(volcano => {
+    const status: VolcanoStatus =
+      volcano.computedStatus ||
+      (volcano.details["Status"] as VolcanoStatus) ||
+      "Durmiente"
+    return status === "Durmiente"
+  }).length
+
+  const extinctVolcanoes = volcanoes.filter(volcano => {
+    const status: VolcanoStatus =
+      volcano.computedStatus ||
+      (volcano.details["Status"] as VolcanoStatus) ||
+      "Durmiente"
+    return status === "Extinto"
+  }).length
+
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -61,11 +58,9 @@ const Volcanoes = ({ volcanoes }: { volcanoes: any[] }) => {
             <div className="flex items-center gap-2">
               <Mountain className="h-5 w-5 text-red-500" />
               <div>
-                <div className="text-2xl font-medium">
-                  {volcanoes.filter(v => v.status === "Activo").length}
-                </div>
+                <div className="text-2xl font-medium">{activeVolcanoes}</div>
                 <div className="text-sm text-muted-foreground">
-                  Volcanes activos
+                  {t("active")}
                 </div>
               </div>
             </div>
@@ -75,16 +70,12 @@ const Volcanoes = ({ volcanoes }: { volcanoes: any[] }) => {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              <AlertTriangle className="h-5 w-5 text-blue-500" />
               <div>
-                <div className="text-2xl font-medium">
-                  {
-                    volcanoes.filter(
-                      v => v.alertLevel === "Naranja" || v.alertLevel === "Roja"
-                    ).length
-                  }
+                <div className="text-2xl font-medium">{dormantVolcanoes}</div>
+                <div className="text-sm text-muted-foreground">
+                  {t("dormant")}
                 </div>
-                <div className="text-sm text-muted-foreground">En alerta</div>
               </div>
             </div>
           </CardContent>
@@ -93,13 +84,11 @@ const Volcanoes = ({ volcanoes }: { volcanoes: any[] }) => {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Thermometer className="h-5 w-5 text-yellow-500" />
+              <Thermometer className="h-5 w-5 text-gray-500" />
               <div>
-                <div className="text-2xl font-medium">
-                  {Math.max(...volcanoes.map(v => v.temperature))}°C
-                </div>
+                <div className="text-2xl font-medium">{extinctVolcanoes}</div>
                 <div className="text-sm text-muted-foreground">
-                  Temp. máxima
+                  {t("extinct")}
                 </div>
               </div>
             </div>
@@ -110,7 +99,7 @@ const Volcanoes = ({ volcanoes }: { volcanoes: any[] }) => {
       {/* Volcano Activity */}
       <Card>
         <CardHeader>
-          <CardTitle>Actividad Volcánica</CardTitle>
+          <CardTitle>{t("activity")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -122,55 +111,53 @@ const Volcanoes = ({ volcanoes }: { volcanoes: any[] }) => {
                     <div>
                       <h4 className="font-medium">{volcano.name}</h4>
                       <div className="text-sm text-muted-foreground">
-                        Elevación: {volcano.elevation} m
+                        {t("elevation")}:{" "}
+                        {volcano.subDetails["Summit Elevation"] ||
+                          volcano.subDetails["Elevation"] ||
+                          "N/A"}{" "}
+                        m
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-3 h-3 rounded-full ${getAlertLevelColor(
-                        volcano.alertLevel
-                      )}`}
-                    />
-                    <span className="text-sm font-medium">
-                      Alerta {volcano.alertLevel}
-                    </span>
-                  </div>
+                  <div className="flex items-center gap-2"></div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Estado:</span>
+                      <span className="text-sm font-medium">
+                        {t("status")}:
+                      </span>
                       <span
                         className={`text-sm ${getVolcanoStatusColor(
-                          volcano.status
+                          volcano.computedStatus ||
+                            (volcano.details["Status"] as VolcanoStatus) ||
+                            "Durmiente",
                         )}`}
                       >
-                        {volcano.status}
+                        {volcano.computedStatus ||
+                          volcano.details["Status"] ||
+                          "Durmiente"}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Thermometer className="h-4 w-4 text-orange-500" />
-                      <span className="text-sm">{volcano.temperature}°C</span>
-                    </div>
                     <div className="text-sm text-muted-foreground">
-                      Última erupción: {formatDateTime(volcano.lastEruption)}
+                      {t("lastEruption")}:{" "}
+                      {(() => {
+                        const key = volcano.computedEruptionTime || "D1"
+                        const entry =
+                          ERUPTION_TIME_CODES[key] || ERUPTION_TIME_CODES["D1"]
+                        return entry?.range || "Unknown"
+                      })()}
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <div className="text-sm">
-                      <span className="font-medium">Actividad actual:</span>
-                      <div className="mt-1">{volcano.activity}</div>
-                    </div>
+                    <div className="text-sm"></div>
                   </div>
                 </div>
 
                 <div className="mt-3 pt-3 border-t">
-                  <p className="text-sm text-muted-foreground">
-                    {volcano.description}
-                  </p>
+                  <p className="text-sm text-muted-foreground"></p>
                 </div>
               </div>
             ))}

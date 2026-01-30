@@ -77,6 +77,8 @@
   "scripts": {
     "dev": "next dev --experimental-https",
     "build": "next build",
-    "tscheck": "tsc --noEmit -p tsconfig.json"
+    "tscheck": "tsc --noEmit -p tsconfig.json",
+    "changelog": "node scripts/generate-changelog.js",
+    "changelog:dry-run": "node scripts/generate-changelog.js --dry-run"
   }
 }

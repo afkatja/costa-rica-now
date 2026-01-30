@@ -73,7 +73,7 @@ interface WeatherDataContextType {
     radar: string | null
     tides: string | null
   }
-  fetchAllData: () => Promise<void>
+  // fetchAllData: () => Promise<void>
   refreshWeather: () => Promise<void>
   refreshRadar: () => Promise<void>
   refreshTides: () => Promise<void>
@@ -271,15 +271,15 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
     }
   }
 
-  // Fetch all data
-  const fetchAllData = async () => {
-    await Promise.all([refreshWeather(), refreshRadar(), refreshTides()])
-  }
+  // // Fetch all data
+  // const fetchAllData = async () => {
+  //   await Promise.all([refreshWeather(), refreshRadar(), refreshTides()])
+  // }
 
-  // Initial data fetch
-  useEffect(() => {
-    fetchAllData()
-  }, [])
+  // // Initial data fetch
+  // useEffect(() => {
+  //   fetchAllData()
+  // }, [])
 
   const value: WeatherDataContextType = {
     weatherData,
@@ -287,7 +287,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
     tidesData,
     loading,
     errors,
-    fetchAllData,
+    // fetchAllData,
     refreshWeather,
     refreshRadar,
     refreshTides,

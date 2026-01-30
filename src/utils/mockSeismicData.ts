@@ -117,7 +117,7 @@ export const mockSeismicData = {
       coordinates: { lat: 10.0252, lon: -83.7671 },
       elevation: 3340,
       status: "Activo",
-      alertLevel: "Naranja",
+      alertLevel: "Roja",
       lastEruption: "2024-12-14T16:45:00Z",
       activity: "Emisiones de ceniza significativas",
       temperature: 920,

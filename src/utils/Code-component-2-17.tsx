@@ -11,7 +11,7 @@ export const mockSeismicData = {
       intensity: "Ligero",
       felt: true,
       reports: 45,
-      significance: 320
+      significance: 320,
     },
     {
       id: "cr2024002",
@@ -23,7 +23,7 @@ export const mockSeismicData = {
       intensity: "Ligero",
       felt: true,
       reports: 12,
-      significance: 280
+      significance: 280,
     },
     {
       id: "cr2024003",
@@ -35,7 +35,7 @@ export const mockSeismicData = {
       intensity: "Moderado",
       felt: true,
       reports: 156,
-      significance: 450
+      significance: 450,
     },
     {
       id: "cr2024004",
@@ -47,7 +47,7 @@ export const mockSeismicData = {
       intensity: "Muy ligero",
       felt: false,
       reports: 3,
-      significance: 150
+      significance: 150,
     },
     {
       id: "cr2024005",
@@ -59,8 +59,8 @@ export const mockSeismicData = {
       intensity: "Fuerte",
       felt: true,
       reports: 423,
-      significance: 680
-    }
+      significance: 680,
+    },
   ],
   volcanoes: [
     {
@@ -73,43 +73,46 @@ export const mockSeismicData = {
       lastEruption: "2024-12-10T06:30:00Z",
       activity: "Emisión de gases y ceniza ligera",
       temperature: 850,
-      description: "Actividad volcánica normal con emisiones menores de gases volcánicos."
+      description:
+        "Actividad volcánica normal con emisiones menores de gases volcánicos.",
     },
     {
       id: "poas",
       name: "Volcán Poás",
-      coordinates: { lat: 10.2000, lon: -84.2333 },
+      coordinates: { lat: 10.2, lon: -84.2333 },
       elevation: 2708,
       status: "Activo",
       alertLevel: "Verde",
       lastEruption: "2024-12-08T14:20:00Z",
       activity: "Emisión de gases sulfurosos",
       temperature: 720,
-      description: "Actividad fumarólica constante en el cráter principal."
+      description: "Actividad fumarólica constante en el cráter principal.",
     },
     {
       id: "irazu",
       name: "Volcán Irazú",
-      coordinates: { lat: 9.9792, lon: -83.8520 },
+      coordinates: { lat: 9.9792, lon: -83.852 },
       elevation: 3432,
       status: "Durmiente",
       alertLevel: "Verde",
       lastEruption: "1994-12-09T00:00:00Z",
       activity: "Sin actividad reciente",
       temperature: 350,
-      description: "Sin actividad volcánica significativa. Monitoreo rutinario."
+      description:
+        "Sin actividad volcánica significativa. Monitoreo rutinario.",
     },
     {
       id: "rincon",
       name: "Rincón de la Vieja",
-      coordinates: { lat: 10.8300, lon: -85.3240 },
+      coordinates: { lat: 10.83, lon: -85.324 },
       elevation: 1916,
       status: "Activo",
       alertLevel: "Amarilla",
       lastEruption: "2024-12-12T09:15:00Z",
       activity: "Explosiones freatomagmáticas menores",
       temperature: 680,
-      description: "Actividad explosiva menor con emisión de ceniza y vapor de agua."
+      description:
+        "Actividad explosiva menor con emisión de ceniza y vapor de agua.",
     },
     {
       id: "turrialba",
@@ -117,11 +120,12 @@ export const mockSeismicData = {
       coordinates: { lat: 10.0252, lon: -83.7671 },
       elevation: 3340,
       status: "Activo",
-      alertLevel: "Naranja",
+      alertLevel: "Roja",
       lastEruption: "2024-12-14T16:45:00Z",
       activity: "Emisiones de ceniza significativas",
       temperature: 920,
-      description: "Incremento en la actividad con emisiones de ceniza que afectan comunidades cercanas."
-    }
-  ]
-};
+      description:
+        "Incremento en la actividad con emisiones de ceniza que afectan comunidades cercanas.",
+    },
+  ],
+}
