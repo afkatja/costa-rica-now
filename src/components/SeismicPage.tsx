@@ -1,4 +1,4 @@
-"use client"
+// "use client"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
@@ -20,6 +20,7 @@ import { useTranslations } from "next-intl"
 import { SeismicEvent, SeismicDataResponse } from "../types/seismic"
 import { TimeFilter, SourceFilter } from "../types/filters"
 import { Volcano, VolcanoesResponse } from "../types/volcano"
+import useSWR from "swr"
 
 export const formatDateTime = (time: string | number | Date) => {
   return new Date(time).toLocaleString("es-CR", {
@@ -33,14 +34,6 @@ export const formatDateTime = (time: string | number | Date) => {
 
 export function SeismicPage() {
   const t = useTranslations("SeismicPage")
-  const [loading, setLoading] = useState(false)
-  const [earthquakesLoading, setEarthquakesLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [earthquakes, setEarthquakes] = useState<SeismicEvent[]>([])
-  const [totalEarthquakes, setTotalEarthquakes] = useState(0)
-  const [earthquakeStats, setEarthquakeStats] = useState<
-    SeismicDataResponse["metadata"]["stats"] | null
-  >(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [volcanoes, setVolcanoes] = useState<Volcano[]>([])
@@ -77,163 +70,117 @@ export function SeismicPage() {
     }
   }, [position, geoLoading, geoError, requestLocation])
 
-  const fetchSeismicData = async (page: number = 1, filters?: any) => {
-    try {
-      setLoading(true)
-      setEarthquakesLoading(true)
-      setError(null)
-
-      const offset = (page - 1) * itemsPerPage
-      const now = new Date()
-      const timeRanges: Record<string, number> = {
-        [TimeFilter.Last24Hours]: 24 * 60 * 60 * 1000,
-        [TimeFilter.Last3Days]: 3 * 24 * 60 * 60 * 1000,
-        [TimeFilter.Week]: 7 * 24 * 60 * 60 * 1000,
-        [TimeFilter.Month]: 30 * 24 * 60 * 60 * 1000,
-      }
-      // Calculate date range based on filter
-      let startDate: string
-      const endDate = new Date().toISOString().split("T")[0]
-
-      // Handle date range calculation with proper null checking
-      if (
-        filters &&
-        filters.timeFilter &&
-        filters.timeFilter !== TimeFilter.All &&
-        timeRanges[filters.timeFilter]
-      ) {
-        startDate = new Date(now.getTime() - timeRanges[filters.timeFilter])
-          .toISOString()
-          .split("T")[0]
-      } else {
-        // Default to 1 month
-        const defaultTimeRange = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
-        startDate = new Date(now.getTime() - defaultTimeRange)
-          .toISOString()
-          .split("T")[0]
-      }
-
-      const requestBody: any = {
-        startDate,
-        endDate,
-        type: "earthquake",
-        limit: itemsPerPage,
-        offset,
-      }
-
-      // Add filters to request
-      if (filters?.magnitudeFilter) {
-        requestBody.minMagnitude = 5
-      }
-
-      if (filters?.sourceFilter && filters.sourceFilter !== SourceFilter.All) {
-        requestBody.source = filters.sourceFilter
-      }
-
-      // Add location-based filtering if enabled and position available
-      if (filters?.locationFilter && position) {
-        requestBody.lat = position.latitude
-        requestBody.lon = position.longitude
-        requestBody.radiusKm = 50
-      }
-
-      const response = await supabase.functions.invoke("seismic-service", {
-        body: requestBody,
-      })
-
-      if (response.error) {
-        console.error("Supabase function error:", response.error)
-        setError(response.error.message || "Failed to fetch seismic data")
-        return
-      }
-
-      if (!response.data) {
-        setError("No data received from seismic service")
-        return
-      }
-
-      setEarthquakes(response.data.events)
-      setTotalEarthquakes(response.data.metadata.stats.total)
-      setEarthquakeStats(response.data.metadata.stats)
-      setCurrentPage(page)
-    } catch (error) {
-      console.error("Error fetching seismic data", error)
-      setError(error instanceof Error ? error.message : "Unknown error")
-    } finally {
-      setLoading(false)
-      setEarthquakesLoading(false)
+  // SWR fetcher for seismic data
+  const fetchSeismic = async (key: string) => {
+    const [_tag, page, filters] = JSON.parse(key)
+    const offset = (page - 1) * itemsPerPage
+    const now = new Date()
+    const timeRanges: Record<string, number> = {
+      [TimeFilter.Last24Hours]: 24 * 60 * 60 * 1000,
+      [TimeFilter.Last3Days]: 3 * 24 * 60 * 60 * 1000,
+      [TimeFilter.Week]: 7 * 24 * 60 * 60 * 1000,
+      [TimeFilter.Month]: 30 * 24 * 60 * 60 * 1000,
     }
+    let startDate: string
+    const endDate = new Date().toISOString().split("T")[0]
+    if (
+      filters &&
+      filters.timeFilter &&
+      filters.timeFilter !== TimeFilter.All &&
+      timeRanges[filters.timeFilter]
+    ) {
+      startDate = new Date(now.getTime() - timeRanges[filters.timeFilter])
+        .toISOString()
+        .split("T")[0]
+    } else {
+      const defaultTimeRange = 30 * 24 * 60 * 60 * 1000
+      startDate = new Date(now.getTime() - defaultTimeRange)
+        .toISOString()
+        .split("T")[0]
+    }
+    const requestBody: any = {
+      startDate,
+      endDate,
+      type: "earthquake",
+      limit: itemsPerPage,
+      offset,
+    }
+    if (filters?.magnitudeFilter) {
+      requestBody.minMagnitude = 5
+    }
+    if (filters?.sourceFilter && filters.sourceFilter !== SourceFilter.All) {
+      requestBody.source = filters.sourceFilter
+    }
+    if (filters?.locationFilter && position) {
+      requestBody.lat = position.latitude
+      requestBody.lon = position.longitude
+      requestBody.radiusKm = 50
+    }
+    const response = await supabase.functions.invoke("seismic-service", {
+      body: requestBody,
+    })
+    if (response.error) {
+      throw new Error(response.error.message || "Failed to fetch seismic data")
+    }
+    if (!response.data) {
+      throw new Error("No data received from seismic service")
+    }
+    return response.data
   }
 
+  // SWR hook for seismic data
+  const {
+    data: seismicData,
+    error: seismicError,
+    isLoading: seismicLoading,
+    mutate: mutateSeismic,
+  } = useSWR(
+    activeTab === "earthquakes"
+      ? JSON.stringify([
+          "seismic",
+          currentPage,
+          {
+            timeFilter: debouncedTimeFilter,
+            magnitudeFilter: debouncedMagnitudeFilter,
+            sourceFilter: debouncedSourceFilter,
+            locationFilter: debouncedLocationFilter,
+          },
+        ])
+      : null,
+    fetchSeismic,
+    { dedupingInterval: 60000, revalidateOnFocus: false },
+  )
+
+  // SWR fetcher for volcano data
   const fetchVolcanoes = async () => {
-    try {
+    const response = await supabase.functions.invoke("volcanic-service", {
+      body: { country: "Costa Rica", timeRange: "D1" },
+    })
+    if (!response.data?.success) {
+      throw new Error(response.data?.error || "Failed to fetch volcano data")
+    }
+    return (response.data as VolcanoesResponse).volcanoes
+  }
+
+  // Fetch volcanoes when tab switches
+  useEffect(() => {
+    if (activeTab === "volcanoes") {
       setVolcanoLoading(true)
-      setVolcanoError(null)
-
-      const response = await supabase.functions.invoke("volcanic-service", {
-        body: {
-          country: "Costa Rica",
-          timeCode: "D1",
-        },
-      })
-
-      if (!response.data?.success) {
-        throw new Error(response.data?.error || "Failed to fetch volcano data")
-      }
-
-      const volcanoData = response.data as VolcanoesResponse
-      setVolcanoes(volcanoData.volcanoes)
-    } catch (error) {
-      console.error("Error fetching volcanic data", error)
-      setVolcanoError(error instanceof Error ? error.message : "Unknown error")
-      setVolcanoes([]) // Reset to empty array on error
-    } finally {
-      setVolcanoLoading(false)
+      fetchVolcanoes()
+        .then(setVolcanoes)
+        .catch(err => {
+          console.error(err)
+          setVolcanoError(err.message)
+          setVolcanoes([])
+        })
+        .finally(() => setVolcanoLoading(false))
     }
-  }
-
-  // Handle filter changes
-  const handleFilterChange = () => {
-    const filters = {
-      timeFilter,
-      magnitudeFilter,
-      sourceFilter,
-      locationFilter,
-    }
-    fetchSeismicData(1, filters) // Reset to page 1 when filters change
-  }
-
-  // Watch for debounced filter changes and refetch data
-  useEffect(() => {
-    if (activeTab === "earthquakes") {
-      const filters = {
-        timeFilter: debouncedTimeFilter,
-        magnitudeFilter: debouncedMagnitudeFilter,
-        sourceFilter: debouncedSourceFilter,
-        locationFilter: debouncedLocationFilter,
-      }
-      fetchSeismicData(1, filters)
-    }
-  }, [
-    debouncedTimeFilter,
-    debouncedMagnitudeFilter,
-    debouncedSourceFilter,
-    debouncedLocationFilter,
-    activeTab,
-  ])
-
-  // Request location permission and fetch seismic data on mount
-  useEffect(() => {
-    if (!position && !geoLoading && !geoError) {
-      requestLocation()
-    }
-    // if (geoError) setError(geoError)
-  }, [position, geoLoading, geoError, requestLocation])
-
-  useEffect(() => {
-    if (activeTab === "earthquakes") fetchSeismicData()
-    if (activeTab === "volcanoes") fetchVolcanoes()
   }, [activeTab])
+
+  // Handle filter changes – reset pagination
+  const handleFilterChange = () => {
+    setCurrentPage(1)
+  }
 
   return (
     <div className="space-y-6">
@@ -265,47 +212,45 @@ export function SeismicPage() {
               <CardTitle>{t("mapTitle")}</CardTitle>
             </CardHeader>
             <CardContent>
-              {loading || geoLoading ? (
+              {seismicLoading || geoLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   <span className="ml-2 text-muted-foreground">
                     {t("loading")}
                   </span>
                 </div>
-              ) : error ? (
+              ) : seismicError ? (
                 <div className="text-center py-8">
                   <div className="text-red-500 mb-2">{t("error")}</div>
                   <div className="text-sm text-muted-foreground mb-4">
-                    {error}
+                    {seismicError instanceof Error
+                      ? seismicError.message
+                      : String(seismicError)}
                   </div>
                   <button
-                    onClick={() => fetchSeismicData(currentPage)}
+                    onClick={() => mutateSeismic?.()}
                     className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
                   >
                     {t("retry")}
                   </button>
                 </div>
               ) : (
-                <SeismicMap locations={earthquakes} type="earthquake" />
+                <SeismicMap
+                  locations={seismicData?.events ?? []}
+                  type="earthquake"
+                />
               )}
             </CardContent>
           </Card>
 
           <Earthquakes
-            earthquakes={earthquakes}
-            totalCount={totalEarthquakes}
-            stats={earthquakeStats}
+            earthquakes={seismicData?.events ?? []}
+            totalCount={seismicData?.metadata?.stats?.total ?? 0}
+            stats={seismicData?.metadata?.stats ?? null}
             currentPage={currentPage}
             itemsPerPage={itemsPerPage}
-            loading={earthquakesLoading}
-            onPageChange={page =>
-              fetchSeismicData(page, {
-                timeFilter,
-                magnitudeFilter,
-                sourceFilter,
-                locationFilter,
-              })
-            }
+            loading={seismicLoading}
+            onPageChange={page => setCurrentPage(page)}
             filters={{
               timeFilter,
               magnitudeFilter,
@@ -313,10 +258,22 @@ export function SeismicPage() {
               locationFilter,
             }}
             onFilterChange={{
-              setTimeFilter,
-              setMagnitudeFilter,
-              setSourceFilter,
-              setLocationFilter,
+              setTimeFilter: (value: TimeFilter) => {
+                setTimeFilter(value)
+                handleFilterChange()
+              },
+              setMagnitudeFilter: (value: boolean) => {
+                setMagnitudeFilter(value)
+                handleFilterChange()
+              },
+              setSourceFilter: (value: SourceFilter) => {
+                setSourceFilter(value)
+                handleFilterChange()
+              },
+              setLocationFilter: (value: boolean) => {
+                setLocationFilter(value)
+                handleFilterChange()
+              },
             }}
             position={position}
             requestLocation={requestLocation}
@@ -344,7 +301,17 @@ export function SeismicPage() {
                     {volcanoError}
                   </div>
                   <button
-                    onClick={() => fetchVolcanoes()}
+                    onClick={() => {
+                      setVolcanoLoading(true)
+                      fetchVolcanoes()
+                        .then(setVolcanoes)
+                        .catch(err => {
+                          console.error(err)
+                          setVolcanoError(err.message)
+                          setVolcanoes([])
+                        })
+                        .finally(() => setVolcanoLoading(false))
+                    }}
                     className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
                   >
                     {t("retry")}
