@@ -84,11 +84,14 @@ Deno.serve(
         locationsToFetch =
           locations && locations.length > 0
             ? locations
+                .filter(
+                  (loc: keyof typeof costaRicaDestinations) =>
+                    loc in costaRicaDestinations,
+                )
                 .map((loc: keyof typeof costaRicaDestinations) => ({
                   key: loc,
                   ...costaRicaDestinations[loc],
                 }))
-                .filter(Boolean)
             : Object.entries(costaRicaDestinations).map(([key, dest]) => ({
                 key,
                 name: dest.name,

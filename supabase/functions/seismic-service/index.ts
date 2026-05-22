@@ -6,6 +6,22 @@ import { withEdgeHandler } from "../_shared/edge-handler.ts"
 // Add Deno type for Edge Functions
 declare const Deno: any
 
+// Helper function to validate date strings
+function validateDateString(dateString: string): {
+  valid: boolean
+  date?: Date
+} {
+  if (!dateString || typeof dateString !== "string") {
+    return { valid: false }
+  }
+
+  const date = new Date(dateString)
+  return {
+    valid: !isNaN(date.getTime()),
+    date: !isNaN(date.getTime()) ? date : undefined,
+  }
+}
+
 // Helper function to format datetime for Costa Rica locale
 function formatDateTime(timestamp: number): string {
   return new Date(timestamp).toLocaleString("es-CR", {
@@ -648,7 +664,21 @@ Deno.serve(
         params.radiusKm
 
       if (hasFilters && params.startDate) {
-        const startDate = new Date(params.startDate)
+        const startDateValidation = validateDateString(params.startDate)
+        if (!startDateValidation.valid) {
+          return new Response(
+            JSON.stringify({
+              error: "Invalid startDate parameter",
+              message: "startDate must be a valid date string",
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          )
+        }
+
+        const startDate = startDateValidation.date!
         // Go back one month to get more data for filtering
         startDate.setMonth(startDate.getMonth() - 1)
         adjustedParams.startDate = startDate.toISOString().split("T")[0] // YYYY-MM-DD format
@@ -705,12 +735,28 @@ Deno.serve(
       ) => {
         if (!start && !end) return events
 
-        const startTs = start
-          ? new Date(`${start}T00:00:00-06:00`).getTime()
-          : new Date().getTime() - 24 * 60 * 60 * 1000
-        const endTs = end
-          ? new Date(`${end}T23:59:59-06:00`).getTime()
-          : new Date().getTime()
+        let startTs: number
+        let endTs: number
+
+        if (start) {
+          const startValidation = validateDateString(start)
+          if (!startValidation.valid) {
+            throw new Error(`Invalid startDate parameter: ${start}`)
+          }
+          startTs = startValidation.date!.getTime()
+        } else {
+          startTs = new Date().getTime() - 24 * 60 * 60 * 1000
+        }
+
+        if (end) {
+          const endValidation = validateDateString(end)
+          if (!endValidation.valid) {
+            throw new Error(`Invalid endDate parameter: ${end}`)
+          }
+          endTs = endValidation.date!.getTime()
+        } else {
+          endTs = new Date().getTime()
+        }
 
         return events.filter(e => e.time >= startTs && e.time <= endTs)
       }

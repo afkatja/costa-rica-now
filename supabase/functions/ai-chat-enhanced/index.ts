@@ -16,7 +16,16 @@ Deno.serve(
         } = await req.json()
 
         if (!message) {
-          throw new Error("Message is required")
+          return new Response(
+            JSON.stringify({
+              error: "message_required",
+              message: "Message is required",
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          )
         }
 
         // Get environment variables
@@ -151,7 +160,7 @@ Deno.serve(
               // Create weather context for AI
               weatherContext = currentWeather
                 .map(
-                  w =>
+                  (w: any) =>
                     `${w.name}: ${w.current.temperature}°C, ${w.current.description}, humidity ${w.current.humidity}%`,
                 )
                 .join("; ")
@@ -255,7 +264,7 @@ Deno.serve(
             .toLowerCase()
             .split(/\s+/)
             .filter(
-              term =>
+              (term: string) =>
                 term.length > 3 &&
                 ![
                   "what",
@@ -273,7 +282,9 @@ Deno.serve(
           if (searchTerms.length > 0) {
             // Search by content using text matching
             const textSearchQuery = searchTerms
-              .map(term => `content.ilike.%${term}%`)
+              .map(
+                (term: string) => `content.ilike.%${encodeURIComponent(term)}%`,
+              )
               .join(",")
 
             const textSearchResponse = await fetch(
@@ -328,7 +339,7 @@ Deno.serve(
         // Build context for AI
         const knowledgeContext = relevantKnowledge
           .map(
-            item =>
+            (item: { title: string; location?: string; content: string }) =>
               `Title: ${item.title}\nLocation: ${
                 item.location || "General"
               }\nContent: ${item.content}`,
@@ -336,7 +347,10 @@ Deno.serve(
           .join("\n\n---\n\n")
 
         const conversationHistory = recentHistory
-          .map(msg => `${msg.role}: ${msg.content}`)
+          .map(
+            (msg: { role: string; content: string }) =>
+              `${msg.role}: ${msg.content}`,
+          )
           .join("\n")
 
         // Generate AI response based on provider
@@ -405,10 +419,13 @@ Deno.serve(
       } catch (error) {
         console.error("AI chat error:", error)
 
+        const errorMessage =
+          error instanceof Error ? error.message : String(error)
+
         const errorResponse = {
           error: {
             code: "AI_CHAT_ERROR",
-            message: error.message,
+            message: errorMessage,
           },
         }
 

@@ -144,6 +144,8 @@ export function SeismicPage() {
             magnitudeFilter: debouncedMagnitudeFilter,
             sourceFilter: debouncedSourceFilter,
             locationFilter: debouncedLocationFilter,
+            latitude: position?.latitude,
+            longitude: position?.longitude,
           },
         ])
       : null,
@@ -165,6 +167,7 @@ export function SeismicPage() {
   // Fetch volcanoes when tab switches
   useEffect(() => {
     if (activeTab === "volcanoes") {
+      setVolcanoError(null)
       setVolcanoLoading(true)
       fetchVolcanoes()
         .then(setVolcanoes)
@@ -303,6 +306,7 @@ export function SeismicPage() {
                   <button
                     onClick={() => {
                       setVolcanoLoading(true)
+                      setVolcanoError(null)
                       fetchVolcanoes()
                         .then(setVolcanoes)
                         .catch(err => {

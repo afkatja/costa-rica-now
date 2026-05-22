@@ -324,7 +324,9 @@ Deno.serve(
             computedEruptionTime:
               timeCode && ERUPTION_TIME_CODES[timeCode]
                 ? ERUPTION_TIME_CODES[timeCode]?.range
-                : "Unknown",
+                : timeCode
+                  ? "Unknown"
+                  : undefined,
             // Add map display properties
             alertLevel,
             elevation:

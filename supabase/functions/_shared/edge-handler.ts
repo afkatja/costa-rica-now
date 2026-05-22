@@ -58,28 +58,62 @@ async function authenticateRequest(
   }
 
   const token = authHeader.replace("Bearer ", "")
-  const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      apikey: serviceRoleKey,
-    },
-  })
 
-  if (!userResponse.ok) {
+  // Add timeout and error handling for auth lookup
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout
+
+  try {
+    const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        apikey: serviceRoleKey,
+      },
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!userResponse.ok) {
+      return jsonResponse(
+        {
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Invalid authentication token",
+          },
+        },
+        401,
+      )
+    }
+
+    const user = await userResponse.json()
+    return { user, token }
+  } catch (error) {
+    clearTimeout(timeoutId)
+
+    // Handle different error types
+    if (error instanceof Error && error.name === "AbortError") {
+      return jsonResponse(
+        {
+          error: {
+            code: "SERVICE_UNAVAILABLE",
+            message: "Authentication service timeout",
+          },
+        },
+        503,
+      )
+    }
+
     return jsonResponse(
       {
         error: {
-          code: "UNAUTHORIZED",
-          message: "Invalid authentication token",
+          code: "SERVICE_UNAVAILABLE",
+          message: "Authentication service unavailable",
         },
       },
-      401,
+      503,
     )
   }
-
-  const user = await userResponse.json()
-
-  return { user, token }
 }
 
 export function withEdgeHandler(
