@@ -6,6 +6,7 @@ import Marker, { baseColorScheme } from "./Marker"
 import { useMap, Map, AdvancedMarker } from "@vis.gl/react-google-maps"
 import { MapTooltip } from "./MapTooltip"
 import { CR_COORDS } from "../hooks/use-radar"
+import type { ColorSet } from "./Marker"
 
 interface BaseMapProps {
   destinations: any[]
@@ -91,7 +92,7 @@ const BaseMap = ({ destinations }: BaseMapProps) => {
   const handleClusterClick = (
     clusterId: number,
     longitude: number,
-    latitude: number
+    latitude: number,
   ) => {
     const expansionZoom =
       superclusterRef?.current?.getClusterExpansionZoom(clusterId)
@@ -103,6 +104,23 @@ const BaseMap = ({ destinations }: BaseMapProps) => {
     setInfoVisible(destination.id || destination.name || null)
     setMarkerAnchor(marker)
     setInfoContent({ header: destination.name, body: destination.content })
+  }
+
+  const getClusterColor = (clusterId: number): ColorSet => {
+    const leaves =
+      superclusterRef.current?.getLeaves(clusterId, Number.POSITIVE_INFINITY) ??
+      []
+    const strongest = leaves.reduce<any | null>((currentStrongest, leaf) => {
+      const destination = leaf.properties.destination
+      if (!currentStrongest) return destination
+
+      const currentMagnitude = Number(currentStrongest.magnitude ?? 0)
+      const nextMagnitude = Number(destination.magnitude ?? 0)
+
+      return nextMagnitude > currentMagnitude ? destination : currentStrongest
+    }, null)
+
+    return strongest?.markerColor ?? baseColorScheme.default
   }
 
   return (
@@ -129,7 +147,7 @@ const BaseMap = ({ destinations }: BaseMapProps) => {
             title={`Cluster of ${pointCount} locations`}
             onClick={() => handleClusterClick(clusterId, lon, lat)}
           >
-            <Marker color={baseColorScheme.default} />
+            <Marker color={getClusterColor(clusterId)} />
           </AdvancedMarker>
         ) : (
           <MapMarker
