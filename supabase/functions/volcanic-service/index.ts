@@ -1,6 +1,9 @@
 import { COSTA_RICA_VOLCANOES, VOLCANO_COORDINATES } from "../_shared/coords.ts"
 import { corsHeaders } from "../_shared/cors.ts"
+import { withEdgeHandler } from "../_shared/edge-handler.ts"
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.56/deno-dom-wasm.ts"
+
+declare const Deno: any
 
 // Type definitions for volcano data contract
 interface VolcanoEruptionEvent {
@@ -249,126 +252,123 @@ function filterVolcanoesByTimeCode(
   })
 }
 
-Deno.serve(async (req: Request) => {
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders })
-  }
-
-  try {
-    // Parse request parameters
-    let requestData: VolcanoesRequest = {}
-    if (req.method === "POST") {
-      try {
-        requestData = await req.json()
-      } catch (e) {
-        console.warn("Invalid JSON in request body, using defaults")
+Deno.serve(
+  withEdgeHandler(async (req: Request) => {
+    try {
+      // Parse request parameters
+      let requestData: VolcanoesRequest = {}
+      if (req.method === "POST") {
+        try {
+          requestData = await req.json()
+        } catch (e) {
+          console.warn("Invalid JSON in request body, using defaults")
+        }
       }
-    }
 
-    const { country, timeCode } = requestData
+      const { country, timeCode } = requestData
 
-    // Validate country parameter
-    if (country && country !== "Costa Rica") {
+      // Validate country parameter
+      if (country && country !== "Costa Rica") {
+        return new Response(
+          JSON.stringify({
+            error: "Currently only Costa Rica is supported",
+            success: false,
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        )
+      }
+
+      // Scrape volcano data for all Costa Rica volcanoes
+      const volcanoPromises = Object.entries(COSTA_RICA_VOLCANOES).map(
+        ([name, id]) => scrapeVolcanoData(id, name),
+      )
+
+      let volcanoes = (await Promise.all(volcanoPromises)).filter(
+        Boolean,
+      ) as Volcano[]
+
+      // Apply time code filtering if specified
+      volcanoes = filterVolcanoesByTimeCode(volcanoes, timeCode)
+
+      // Enhance volcano data with computed properties for client compatibility
+      const enhancedVolcanoes = volcanoes
+        .filter(volcano => {
+          const coords = VOLCANO_COORDINATES[volcano.id]
+          if (!coords) {
+            console.warn(
+              `Skipping volcano with missing coordinates: id="${volcano.id}", name="${volcano.name}". No entry found in VOLCANO_COORDINATES.`,
+            )
+            return false
+          }
+          return true
+        })
+        .map(volcano => {
+          const coords = VOLCANO_COORDINATES[volcano.id]
+          const status = determineVolcanoStatus(volcano)
+
+          // Map status to alert level for display
+          let alertLevel: AlertLevel = "Verde"
+          if (status === "Activo") alertLevel = "Roja"
+          else if (status === "Durmiente") alertLevel = "Amarilla"
+
+          return {
+            ...volcano,
+            // Add coordinates for map display
+            lat: coords.lat,
+            lng: coords.lng,
+            // Add computed properties that the client expects
+            computedStatus: status,
+            computedEruptionTime:
+              timeCode && ERUPTION_TIME_CODES[timeCode]
+                ? ERUPTION_TIME_CODES[timeCode]?.range
+                : "Unknown",
+            // Add map display properties
+            alertLevel,
+            elevation:
+              volcano.subDetails["Summit Elevation"] ||
+              volcano.subDetails["Elevation"] ||
+              "Unknown",
+          }
+        })
+
+      const response = {
+        success: true,
+        volcanoes: enhancedVolcanoes,
+        metadata: {
+          requestedAt: new Date().toISOString(),
+          source: "Smithsonian GVP Volcano Pages",
+          filters: {
+            country: country || "All",
+            timeCode: timeCode || "All",
+          },
+          count: enhancedVolcanoes.length,
+        },
+      }
+
+      return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    } catch (error) {
+      console.error("Volcanic service error:", error)
+
       return new Response(
         JSON.stringify({
-          error: "Currently only Costa Rica is supported",
+          error:
+            error instanceof Error ? error.message : "Unknown error occurred",
           success: false,
         }),
         {
-          status: 400,
+          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       )
     }
-
-    // Scrape volcano data for all Costa Rica volcanoes
-    const volcanoPromises = Object.entries(COSTA_RICA_VOLCANOES).map(
-      ([name, id]) => scrapeVolcanoData(id, name),
-    )
-
-    let volcanoes = (await Promise.all(volcanoPromises)).filter(
-      Boolean,
-    ) as Volcano[]
-
-    // Apply time code filtering if specified
-    volcanoes = filterVolcanoesByTimeCode(volcanoes, timeCode)
-
-    // Enhance volcano data with computed properties for client compatibility
-    const enhancedVolcanoes = volcanoes
-      .filter(volcano => {
-        const coords = VOLCANO_COORDINATES[volcano.id]
-        if (!coords) {
-          console.warn(
-            `Skipping volcano with missing coordinates: id="${volcano.id}", name="${volcano.name}". No entry found in VOLCANO_COORDINATES.`,
-          )
-          return false
-        }
-        return true
-      })
-      .map(volcano => {
-        const coords = VOLCANO_COORDINATES[volcano.id]
-        const status = determineVolcanoStatus(volcano)
-
-        // Map status to alert level for display
-        let alertLevel: AlertLevel = "Verde"
-        if (status === "Activo") alertLevel = "Roja"
-        else if (status === "Durmiente") alertLevel = "Amarilla"
-
-        return {
-          ...volcano,
-          // Add coordinates for map display
-          lat: coords.lat,
-          lng: coords.lng,
-          // Add computed properties that the client expects
-          computedStatus: status,
-          computedEruptionTime:
-            timeCode && ERUPTION_TIME_CODES[timeCode]
-              ? ERUPTION_TIME_CODES[timeCode]?.range
-              : "Unknown",
-          // Add map display properties
-          alertLevel,
-          elevation:
-            volcano.subDetails["Summit Elevation"] ||
-            volcano.subDetails["Elevation"] ||
-            "Unknown",
-        }
-      })
-
-    const response = {
-      success: true,
-      volcanoes: enhancedVolcanoes,
-      metadata: {
-        requestedAt: new Date().toISOString(),
-        source: "Smithsonian GVP Volcano Pages",
-        filters: {
-          country: country || "All",
-          timeCode: timeCode || "All",
-        },
-        count: enhancedVolcanoes.length,
-      },
-    }
-
-    return new Response(JSON.stringify(response), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    })
-  } catch (error) {
-    console.error("Volcanic service error:", error)
-
-    return new Response(
-      JSON.stringify({
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred",
-        success: false,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    )
-  }
-})
+  }),
+)
 
 // Helper function to determine volcano status based on available data
 function determineVolcanoStatus(volcano: Volcano): VolcanoStatus {
