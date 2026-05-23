@@ -90,7 +90,7 @@ export function SeismicMap({
                       new Date(loc.time).toLocaleString("es-CR")}
                   </span>
                 </div>
-                {loc.felt && loc.felt > 0 && (
+                {!loc.felt || loc.felt === 0 ? null : (
                   <div className="flex items-center gap-1">
                     <span>
                       {t("feels")}: {loc.felt}
