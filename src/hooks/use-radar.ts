@@ -13,23 +13,16 @@ interface RadarData {
   timestamp: number
 }
 
-// Default map parameters for Costa Rica
-const DEFAULT_MAP_PARAMS = {
-  center: { lat: 9.7489, lng: -83.7534 }, // Costa Rica center
-  zoom: 8,
-  range: 2, // 5x5 grid
-}
-
 const latLngToTile = (lat: number, lng: number, zoom: number) => {
   const x = Math.floor(((lng + 180) / 360) * Math.pow(2, zoom))
   const y = Math.floor(
     ((1 -
       Math.log(
-        Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)
+        Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180),
       ) /
         Math.PI) /
       2) *
-      Math.pow(2, zoom)
+      Math.pow(2, zoom),
   )
   return { x, y }
 }
@@ -93,7 +86,7 @@ export function useRadar({
     } catch (err) {
       console.error("Error fetching radar status:", err)
       setError(
-        err instanceof Error ? err.message : "Failed to fetch radar status"
+        err instanceof Error ? err.message : "Failed to fetch radar status",
       )
       setRadarAvailable(false)
     } finally {
@@ -112,11 +105,11 @@ export function useRadar({
     (offsetMinutes: number): number => {
       const targetOffset = Math.max(
         0,
-        Math.min(offsetMinutes, (MAX_FRAMES - 1) * FRAME_INTERVAL_MINUTES)
+        Math.min(offsetMinutes, (MAX_FRAMES - 1) * FRAME_INTERVAL_MINUTES),
       )
       return Math.round(targetOffset / FRAME_INTERVAL_MINUTES)
     },
-    []
+    [],
   )
   /**
    * Get the tile URL for a specific frame, zoom level, and tile coordinates
@@ -133,7 +126,7 @@ export function useRadar({
       // frame.time is already in seconds (absolute timestamp) for Tomorrow.io API
       return `/api/radar/tiles?zoom=${zoom}&x=${x}&y=${y}&field=precipitationIntensity&time=${frame.time}`
     },
-    [radarAvailable, currentFrameIndex, allFrames]
+    [radarAvailable, currentFrameIndex, allFrames],
   )
 
   /**
@@ -145,7 +138,7 @@ export function useRadar({
       frame: RadarFrame | null,
       center: { lat: number; lng: number },
       zoom: number,
-      range: number = 2 // 5x5 grid
+      range: number = 2, // 5x5 grid
     ) => {
       if (!radarAvailable || !frame) return []
 
@@ -172,7 +165,7 @@ export function useRadar({
       }
       return tiles
     },
-    [radarAvailable]
+    [radarAvailable],
   )
 
   const handleFrameChange = useCallback(() => {
@@ -180,7 +173,7 @@ export function useRadar({
       window.dispatchEvent(
         new CustomEvent("radarFrameChanged", {
           detail: { frame: currentFrame, index: currentFrameIndex },
-        })
+        }),
       )
     }
   }, [currentFrame, currentFrameIndex, radarAvailable, generateTilesForFrame])
@@ -198,7 +191,6 @@ export function useRadar({
       } catch (err) {
         // swallow errors from consumer callback to avoid breaking the hook
         // but log for debugging
-        // eslint-disable-next-line no-console
         console.error("useRadar:onFrameChange error:", err)
       }
     }
@@ -207,7 +199,7 @@ export function useRadar({
   const nextFrame = useCallback(() => {
     const newOffset = Math.min(
       currentTimeOffset + FRAME_INTERVAL_MINUTES,
-      (MAX_FRAMES - 1) * FRAME_INTERVAL_MINUTES
+      (MAX_FRAMES - 1) * FRAME_INTERVAL_MINUTES,
     )
     setCurrentTimeOffset(newOffset)
     setCurrentFrameIndex(findFrameIndexByOffset(newOffset))
@@ -226,7 +218,7 @@ export function useRadar({
       setCurrentTimeOffset(newOffset)
       setCurrentFrameIndex(clampedIndex)
     },
-    [allFrames.length]
+    [allFrames.length],
   )
 
   const togglePlayback = useCallback(() => {
@@ -242,9 +234,12 @@ export function useRadar({
     }, 500)
 
     // Refresh frames every 5 minutes to get updated timestamps for Tomorrow.io
-    const refreshInterval = setInterval(() => {
-      setRadarTimestamp(Date.now())
-    }, FRAME_INTERVAL_MINUTES * 60 * 1000)
+    const refreshInterval = setInterval(
+      () => {
+        setRadarTimestamp(Date.now())
+      },
+      FRAME_INTERVAL_MINUTES * 60 * 1000,
+    )
 
     return () => {
       clearInterval(frameInterval)

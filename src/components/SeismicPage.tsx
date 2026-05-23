@@ -3,21 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { SeismicMap } from "./SeismicMap"
-import {
-  Activity,
-  AlertTriangle,
-  Mountain,
-  Thermometer,
-  Loader2,
-} from "lucide-react"
-import { useEffect, useState, useCallback } from "react"
+import { Activity, Mountain, Loader2 } from "lucide-react"
+import { useEffect, useState } from "react"
 import { supabase } from "../utils/supabase/client"
 import { useGeolocation } from "../hooks/use-geolocation"
 import { useDebounce } from "../hooks/use-debounce"
 import Earthquakes from "./Earthquakes"
 import Volcanoes from "./Volcanoes"
 import { useTranslations } from "next-intl"
-import { SeismicEvent, SeismicDataResponse } from "../types/seismic"
 import { TimeFilter, SourceFilter } from "../types/filters"
 import { Volcano, VolcanoesResponse } from "../types/volcano"
 import useSWR from "swr"
@@ -72,7 +65,7 @@ export function SeismicPage() {
 
   // SWR fetcher for seismic data
   const fetchSeismic = async (key: string) => {
-    const [_tag, page, filters] = JSON.parse(key)
+    const [, page, filters] = JSON.parse(key)
     const offset = (page - 1) * itemsPerPage
     const now = new Date()
     const timeRanges: Record<string, number> = {

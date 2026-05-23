@@ -7,16 +7,6 @@ import { useTranslations } from "next-intl"
 import { SeismicEvent } from "../types/seismic"
 import { AlertLevel } from "../types/volcano"
 
-type PinType = "earthquake" | "volcano"
-
-interface SeismicPin {
-  id: string
-  type: PinType
-  lat: number
-  lng: number
-  data: SeismicEvent | any
-}
-
 const getMagnitudeColorScheme = (magnitude: number): ColorSet => {
   if (magnitude >= 6) return baseColorScheme.alert
   if (magnitude >= 4.5 && magnitude < 6) return baseColorScheme.warn

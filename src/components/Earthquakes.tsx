@@ -1,5 +1,5 @@
-import React, { useState, useMemo, memo } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
+import React, { useState, memo } from "react"
+import { TabsContent } from "./ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import {
@@ -24,8 +24,6 @@ import {
   MapPin,
   Clock,
   AlertTriangle,
-  Mountain,
-  Thermometer,
   TrendingUp,
   Filter,
   X,

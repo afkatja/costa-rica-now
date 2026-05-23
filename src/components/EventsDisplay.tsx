@@ -7,7 +7,6 @@ import {
   Clock,
   DollarSign,
   Star,
-  Users,
   Ticket,
   ChevronDown,
   ChevronUp,
@@ -40,8 +39,6 @@ interface EventsDisplayProps {
 }
 
 const getCategoryIcon = (category: string) => {
-  const iconProps = { size: 16, className: "text-gray-50" }
-
   switch (category.toLowerCase()) {
     case "cultural":
     case "culture":
@@ -135,7 +132,7 @@ export function EventsDisplay({
             key={event.id}
             className={cn(
               "flex items-center gap-2 px-3 py-2 rounded-lg text-gray-50 text-sm",
-              `bg-gradient-to-r ${getCategoryGradient(event.category)}`
+              `bg-gradient-to-r ${getCategoryGradient(event.category)}`,
             )}
           >
             <span className="text-lg">{getCategoryIcon(event.category)}</span>
@@ -174,7 +171,7 @@ export function EventsDisplay({
               <div
                 className={cn(
                   "p-4 text-gray-50 relative",
-                  `bg-gradient-to-r ${getCategoryGradient(event.category)}`
+                  `bg-gradient-to-r ${getCategoryGradient(event.category)}`,
                 )}
               >
                 <div className="flex items-start justify-between">

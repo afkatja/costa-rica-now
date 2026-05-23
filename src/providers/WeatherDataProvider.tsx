@@ -1,12 +1,6 @@
 "use client"
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react"
+import React, { createContext, useContext, useState, ReactNode } from "react"
 import { supabase } from "../utils/supabase/client"
 import costaRicaDestinations, {
   coastalDestinations,
@@ -122,7 +116,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
       string,
       [
         string,
-        (typeof costaRicaDestinations)[keyof typeof costaRicaDestinations]
+        (typeof costaRicaDestinations)[keyof typeof costaRicaDestinations],
       ]
     >()
     Object.entries(costaRicaDestinations).forEach(([key, dest]) => {
@@ -148,19 +142,19 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
             locations: allLocationKeys,
             types: ["current"],
           },
-        }
+        },
       )
 
       if (response.error) {
         throw new Error(
-          `Weather service error: ${response.error.message ?? response.error}`
+          `Weather service error: ${response.error.message ?? response.error}`,
         )
       }
 
       const result = response.data?.data
       if (result?.weather) {
         const currentWeather = result.weather.filter(
-          (w: any) => w.type === "current"
+          (w: any) => w.type === "current",
         )
         setWeatherData(currentWeather)
       }
@@ -187,7 +181,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
 
       if (!radarResponse.ok) {
         throw new Error(
-          `HTTP ${radarResponse.status}: ${radarResponse.statusText}`
+          `HTTP ${radarResponse.status}: ${radarResponse.statusText}`,
         )
       }
 
@@ -204,7 +198,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
           lastUpdated: radarStatus.timestamp
             ? new Date(radarStatus.timestamp).toISOString()
             : null,
-        })
+        }),
       )
 
       setRadarData(radarRegionalData)
@@ -229,7 +223,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
       const tidesPromises = coastalDestinations.map(async locationKey => {
         try {
           const response = await fetch(
-            `/api/beaches?destination=${encodeURIComponent(locationKey.id)}`
+            `/api/beaches?destination=${encodeURIComponent(locationKey.id)}`,
           )
           if (!response.ok) return null
 

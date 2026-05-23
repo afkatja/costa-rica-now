@@ -3,19 +3,13 @@ import { InfoWindow } from "@vis.gl/react-google-maps"
 
 interface MapTooltipProps {
   children: ReactNode
-  x?: number
-  y?: number
   anchor?: any
-  className?: string
   onClose?: () => void
   header: React.ReactNode
 }
 
 export function MapTooltip({
   children,
-  x,
-  y,
-  className = "",
   onClose,
   header,
   anchor,
