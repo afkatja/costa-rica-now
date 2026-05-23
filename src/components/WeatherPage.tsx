@@ -13,13 +13,11 @@ import {
   Thermometer,
   Wind,
   CloudRain,
-  Waves,
 } from "lucide-react"
 import WeatherForecast from "./WeatherForecast"
 import WeatherCurrent from "./WeatherCurrent"
 import costaRicaDestinations from "../lib/shared/destinations"
 import MapTooltipContent from "./MapTooltipContent"
-import Tides from "./Tides"
 import Radar from "./Radar"
 import GoogleMapsWrapper from "./GoogleMapsWrapper"
 import RegionalWeather, { TabOfRegional } from "./RegionalWeather"
@@ -56,7 +54,7 @@ const getDestinations = (weatherData: WeatherData[] | null) => {
   if (!weatherData) return null
   const weatherMap: Record<string, WeatherData> = {}
   weatherData.forEach(
-    (weather: WeatherData) => (weatherMap[weather.location] = weather)
+    (weather: WeatherData) => (weatherMap[weather.location] = weather),
   )
 
   const destinations = Object.entries(costaRicaDestinations).map(
@@ -98,7 +96,7 @@ const getDestinations = (weatherData: WeatherData[] | null) => {
           </MapTooltipContent>
         ),
       }
-    }
+    },
   )
   return destinations
 }
@@ -129,7 +127,7 @@ export function WeatherPage() {
   useEffect(() => {
     if (allWeatherData && allWeatherData.length > 0) {
       let userWeather = allWeatherData.find(
-        (w: any) => w.location === "san-jose" // Default
+        (w: any) => w.location === "san-jose", // Default
       )
 
       // If user is in Costa Rica, use their closest location
@@ -148,11 +146,11 @@ export function WeatherPage() {
 
           const prevDist = Math.sqrt(
             Math.pow(prevDest.lat - position.latitude, 2) +
-              Math.pow(prevDest.lon - position.longitude, 2)
+              Math.pow(prevDest.lon - position.longitude, 2),
           )
           const currDist = Math.sqrt(
             Math.pow(currDest.lat - position.latitude, 2) +
-              Math.pow(currDest.lon - position.longitude, 2)
+              Math.pow(currDest.lon - position.longitude, 2),
           )
 
           return currDist < prevDist ? curr : prev
@@ -202,7 +200,7 @@ export function WeatherPage() {
           allWeatherData?.find(
             (w: any) =>
               w.location ===
-              (position && isInCostaRica ? "closest" : "san-jose")
+              (position && isInCostaRica ? "closest" : "san-jose"),
           ) || allWeatherData?.[0]
         }
         weatherLoading={providerLoading.weather}
@@ -226,12 +224,12 @@ export function WeatherPage() {
             value={activeTab}
             onValueChange={val =>
               setActiveTab(
-                stringToEnum(val, TabOfRegional) || TabOfRegional.Weather
+                stringToEnum(val, TabOfRegional) || TabOfRegional.Weather,
               )
             }
             className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-3 mb-4">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="weather">
                 <MapPin className="h-4 w-4 mr-2" />
                 Weather Data
@@ -239,10 +237,6 @@ export function WeatherPage() {
               <TabsTrigger value="radar">
                 <CloudRain className="h-4 w-4 mr-2" />
                 Radar
-              </TabsTrigger>
-              <TabsTrigger value="tides and waves">
-                <Waves className="h4 w-4 mr-2" />
-                Tides and waves
               </TabsTrigger>
             </TabsList>
 
@@ -260,9 +254,6 @@ export function WeatherPage() {
 
             <TabsContent value="radar" className="mt-0 space-y-4">
               <Radar />
-            </TabsContent>
-            <TabsContent value="tides and waves" className="mt-0 space-y-4">
-              <Tides />
             </TabsContent>
           </Tabs>
         </CardContent>
