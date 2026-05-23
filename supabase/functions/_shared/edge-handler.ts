@@ -75,14 +75,54 @@ async function authenticateRequest(
     clearTimeout(timeoutId)
 
     if (!userResponse.ok) {
+      // Handle different types of auth failures appropriately
+      if (userResponse.status === 401) {
+        return jsonResponse(
+          {
+            error: {
+              code: "UNAUTHORIZED",
+              message: "Invalid authentication token",
+            },
+          },
+          401,
+        )
+      }
+
+      // For rate limiting (429) or server errors (5xx), propagate retryable status
+      if (userResponse.status === 429) {
+        return jsonResponse(
+          {
+            error: {
+              code: "RATE_LIMITED",
+              message: "Authentication service rate limit exceeded",
+            },
+          },
+          429,
+        )
+      }
+
+      // For 5xx server errors, map to appropriate retryable status
+      if (userResponse.status >= 500) {
+        return jsonResponse(
+          {
+            error: {
+              code: "SERVICE_UNAVAILABLE",
+              message: "Authentication service temporarily unavailable",
+            },
+          },
+          userResponse.status === 502 ? 502 : 503,
+        )
+      }
+
+      // For other client errors (4xx except 401/429), propagate as bad request
       return jsonResponse(
         {
           error: {
-            code: "UNAUTHORIZED",
-            message: "Invalid authentication token",
+            code: "BAD_REQUEST",
+            message: "Authentication request failed",
           },
         },
-        401,
+        userResponse.status,
       )
     }
 

@@ -743,7 +743,18 @@ Deno.serve(
           if (!startValidation.valid) {
             throw new Error(`Invalid startDate parameter: ${start}`)
           }
-          startTs = startValidation.date!.getTime()
+          // Apply Costa Rica timezone offset (-06:00) for full day coverage
+          const startDate = startValidation.date!
+          startTs =
+            new Date(
+              startDate.getFullYear(),
+              startDate.getMonth(),
+              startDate.getDate(),
+              0,
+              0,
+              0,
+            ).getTime() +
+            6 * 60 * 60 * 1000
         } else {
           startTs = new Date().getTime() - 24 * 60 * 60 * 1000
         }
@@ -753,7 +764,19 @@ Deno.serve(
           if (!endValidation.valid) {
             throw new Error(`Invalid endDate parameter: ${end}`)
           }
-          endTs = endValidation.date!.getTime()
+          // Apply Costa Rica timezone offset (-06:00) for full day coverage
+          const endDate = endValidation.date!
+          endTs =
+            new Date(
+              endDate.getFullYear(),
+              endDate.getMonth(),
+              endDate.getDate(),
+              23,
+              59,
+              59,
+              999,
+            ).getTime() +
+            6 * 60 * 60 * 1000
         } else {
           endTs = new Date().getTime()
         }
