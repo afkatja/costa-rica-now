@@ -3,6 +3,13 @@ import { coastalDestinations } from "@/lib/shared/destinations"
 
 export const dynamic = "force-dynamic"
 
+// Rate limiting configuration
+const RATE_LIMIT = 60 // requests per hour
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000 // 1 hour in ms
+
+// In-memory rate limiting store (for production, consider Redis or database)
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
+
 // Types
 type TideExtreme = {
   time: string
@@ -12,44 +19,142 @@ type TideExtreme = {
 
 import { BeachConditions } from "@/types/beach"
 
-// Fetch tides from Marea API
-async function fetchTides(lat: number, lon: number) {
-  try {
-    const apiKey = process.env.MAREA_API_KEY
+// Validate API key
+function validateApiKey(): string {
+  const apiKey = process.env.MAREA_API_KEY
+  if (!apiKey) {
+    throw new Error("MAREA_API_KEY environment variable is not set")
+  }
+  return apiKey
+}
 
+// Retry logic helper
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000,
+): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (error) {
+      if (attempt === maxRetries - 1) {
+        throw error
+      }
+      const delay = baseDelay * Math.pow(2, attempt)
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+  throw new Error("Max retries exceeded")
+}
+
+// Better rate limiting using IP address from headers
+function getClientIdentifier(request: NextRequest): string {
+  // Try to get real IP from various headers (common in production)
+  const forwardedFor = request.headers.get("x-forwarded-for")
+  const realIp = request.headers.get("x-real-ip")
+  const cfConnectingIp = request.headers.get("cf-connecting-ip") // Cloudflare
+
+  if (forwardedFor) {
+    // x-forwarded-for can contain multiple IPs, take the first one
+    return forwardedFor.split(",")[0].trim()
+  }
+  if (realIp) {
+    return realIp
+  }
+  if (cfConnectingIp) {
+    return cfConnectingIp
+  }
+
+  // Fallback to a combination of headers for better uniqueness
+  const userAgent = request.headers.get("user-agent") || "unknown"
+  const accept = request.headers.get("accept") || "unknown"
+  const acceptLang = request.headers.get("accept-language") || "unknown"
+
+  // Create a hash from headers for better identification
+  return Buffer.from(`${userAgent}:${accept}:${acceptLang}`)
+    .toString("base64")
+    .slice(0, 32)
+}
+
+// Enhanced rate limiting helper with cleanup
+function checkRateLimit(clientId: string): {
+  allowed: boolean
+  remaining: number
+  resetTime: number
+} {
+  const now = Date.now()
+  const clientData = rateLimitStore.get(clientId)
+
+  // Clean up expired entries periodically
+  if (Math.random() < 0.01) {
+    // 1% chance to cleanup
+    for (const [key, data] of rateLimitStore.entries()) {
+      if (now > data.resetTime) {
+        rateLimitStore.delete(key)
+      }
+    }
+  }
+
+  if (!clientData || now > clientData.resetTime) {
+    rateLimitStore.set(clientId, {
+      count: 1,
+      resetTime: now + RATE_LIMIT_WINDOW,
+    })
+    return {
+      allowed: true,
+      remaining: RATE_LIMIT - 1,
+      resetTime: now + RATE_LIMIT_WINDOW,
+    }
+  }
+
+  if (clientData.count >= RATE_LIMIT) {
+    return { allowed: false, remaining: 0, resetTime: clientData.resetTime }
+  }
+
+  clientData.count++
+  return {
+    allowed: true,
+    remaining: RATE_LIMIT - clientData.count,
+    resetTime: clientData.resetTime,
+  }
+}
+
+// Fetch tides from Marea API with retry logic
+async function fetchTides(lat: number, lon: number): Promise<any> {
+  let apiKey: string
+  try {
+    apiKey = validateApiKey()
+  } catch (error) {
+    throw new Error("API configuration error: Unable to validate API key")
+  }
+
+  return retryWithBackoff(async () => {
     const response = await fetch(
       `https://api.marea.ooo/v2/tides?latitude=${lat}&longitude=${lon}`,
       {
         headers: {
-          "x-marea-api-token": apiKey!,
+          "x-marea-api-token": apiKey,
         },
       },
     )
+
     if (!response.ok) {
-      // Handle quota exceeded - stop trying
       if (response.status === 403) {
-        console.log("Marea API quota exceeded - skipping tide data")
         return "QUOTA_EXCEEDED"
       }
-
-      console.error(
+      throw new Error(
         `Marea API error: ${response.status} ${response.statusText}`,
       )
-      return null
     }
 
-    const data = await response.json()
-    console.log("Marea API response:", data)
-    return data
-  } catch (error) {
-    console.error("Error fetching tides:", error)
-    return null
-  }
+    return await response.json()
+  })
 }
 
-// Fetch detailed marine data from Open-Meteo Marine API
-async function fetchMarineData(lat: number, lon: number) {
-  try {
+// Fetch detailed marine data from Open-Meteo Marine API with retry logic
+async function fetchMarineData(lat: number, lon: number): Promise<any> {
+  return retryWithBackoff(async () => {
     const params = new URLSearchParams({
       latitude: lat.toString(),
       longitude: lon.toString(),
@@ -64,16 +169,11 @@ async function fetchMarineData(lat: number, lon: number) {
     )
 
     if (!response.ok) {
-      console.error(`Open-Meteo Marine API error: ${response.status}`)
-      return null
+      throw new Error(`Open-Meteo Marine API error: ${response.status}`)
     }
 
-    const data = await response.json()
-    return data
-  } catch (error) {
-    console.error("Error fetching marine data:", error)
-    return null
-  }
+    return await response.json()
+  })
 }
 
 // Process tide data to find next high/low and current trend
@@ -215,10 +315,41 @@ function getSurfConditions(
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("Request URL:", request.url)
-    console.log("Request method:", request.method)
     const { searchParams } = new URL(request.url)
     const destinationId = searchParams.get("destination")
+
+    // Enhanced rate limiting using client identifier
+    const clientId = getClientIdentifier(request)
+    const rateLimitResult = checkRateLimit(clientId)
+
+    if (!rateLimitResult.allowed) {
+      const resetInMinutes = Math.ceil(
+        (rateLimitResult.resetTime - Date.now()) / (60 * 1000),
+      )
+      return NextResponse.json(
+        {
+          error: "Rate limit exceeded",
+          message: `Too many requests. Try again in ${resetInMinutes} minutes.`,
+          retryAfter: resetInMinutes * 60,
+        },
+        {
+          status: 429,
+          headers: {
+            "X-RateLimit-Limit": RATE_LIMIT.toString(),
+            "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
+            "X-RateLimit-Reset": rateLimitResult.resetTime.toString(),
+            "Retry-After": resetInMinutes.toString(),
+          },
+        },
+      )
+    }
+
+    // Add rate limit headers to successful responses
+    const responseHeaders = {
+      "X-RateLimit-Limit": RATE_LIMIT.toString(),
+      "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
+      "X-RateLimit-Reset": rateLimitResult.resetTime.toString(),
+    }
 
     // If specific destination requested
     if (destinationId) {
@@ -252,7 +383,7 @@ export async function GET(request: NextRequest) {
         lastUpdated: new Date().toISOString(),
       }
 
-      return NextResponse.json(conditions)
+      return NextResponse.json(conditions, { headers: responseHeaders })
     }
     // Process destinations in batches to avoid overwhelming external APIs
     const BATCH_SIZE = 5
@@ -286,7 +417,7 @@ export async function GET(request: NextRequest) {
 
             return conditions
           } catch (error) {
-            console.error(`Error fetching data for ${destination.name}:`, error)
+            // Log error but don't expose details to client
             return null
           }
         }),
@@ -297,14 +428,16 @@ export async function GET(request: NextRequest) {
     // Filter out any failed requests
     const validConditions = allConditions.filter(Boolean)
 
-    return NextResponse.json({
-      destinations: validConditions,
-      count: validConditions.length,
-    })
-  } catch (error: any) {
-    console.error("Error in beach conditions API:", error)
     return NextResponse.json(
-      { error: "Internal server error", details: error.message },
+      {
+        destinations: validConditions,
+        count: validConditions.length,
+      },
+      { headers: responseHeaders },
+    )
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: "Internal server error" },
       { status: 500 },
     )
   }
