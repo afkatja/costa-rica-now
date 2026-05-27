@@ -5,6 +5,7 @@ import {
   SourceFilter,
   MagnitudeFilter,
   LocationFilter,
+  SeismicFilters,
 } from "../types/shared"
 import { ValidationError, handleAsyncError } from "./error-handling"
 
@@ -12,12 +13,7 @@ import { ValidationError, handleAsyncError } from "./error-handling"
  * Check if any filters are currently active
  * Simplifies complex conditional logic for filter state checking
  */
-export function hasActiveFilters(filters: {
-  timeFilter: TimeFilter
-  magnitudeFilter: MagnitudeFilter
-  sourceFilter: SourceFilter
-  locationFilter: LocationFilter
-}): boolean {
+export function hasActiveFilters(filters: SeismicFilters): boolean {
   return (
     filters.timeFilter !== TimeFilter.All ||
     filters.magnitudeFilter.enabled ||

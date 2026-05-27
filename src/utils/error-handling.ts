@@ -22,6 +22,11 @@ export class NetworkError extends AppError {
     super(message, "NETWORK_ERROR", statusCode, true)
     this.name = "NetworkError"
   }
+
+  get isRecoverableError(): boolean {
+    // Server-side failures (5xx) are not recoverable, client-side (4xx) are
+    return this.statusCode < 500 && this.statusCode >= 400
+  }
 }
 
 // Validation errors

@@ -34,11 +34,16 @@ export const useMapPins = (
 
     return locations.map(loc => {
       const isEarthquake = type === "earthquake"
-      const lat = (loc as any).coordinates?.lat || loc.lat
-      const lng =
-        (loc as any).coordinates?.lon ||
-        (loc as any).lng ||
-        (loc as SeismicEvent).lon
+
+      // Type-safe coordinate access based on type
+      const lat = isEarthquake
+        ? (loc as SeismicEvent).lat
+        : (loc as Volcano).lat
+      const lng = isEarthquake
+        ? (loc as SeismicEvent).lon
+        : (loc as Volcano).lng
+
+      // Type-safe name access based on type
       const name = isEarthquake
         ? (loc as SeismicEvent).location
         : (loc as Volcano).name
@@ -74,10 +79,10 @@ export const createLocationKey = (
   if (!locations || locations.length === 0) return "empty"
 
   return locations
-    .map(
-      loc =>
-        `${loc.id}-${loc.lat}-${(loc as any).lng || (loc as SeismicEvent).lon}`,
-    )
+    .map(loc => {
+      const isEarthquake = "location" in loc
+      return `${loc.id}-${loc.lat}-${isEarthquake ? (loc as SeismicEvent).lon : (loc as Volcano).lng}`
+    })
     .sort()
     .join("|")
 }
@@ -99,9 +104,12 @@ export const calculatePin = (
   ) => React.ReactNode,
 ): MapPin => {
   const isEarthquake = type === "earthquake"
-  const lat = (loc as any).coordinates?.lat || loc.lat
-  const lng =
-    (loc as any).coordinates?.lon || (loc as any).lng || (loc as any).lon
+
+  // Type-safe coordinate access based on type
+  const lat = isEarthquake ? (loc as SeismicEvent).lat : (loc as Volcano).lat
+  const lng = isEarthquake ? (loc as SeismicEvent).lon : (loc as Volcano).lng
+
+  // Type-safe name access based on type
   const name = isEarthquake
     ? (loc as SeismicEvent).location
     : (loc as Volcano).name
