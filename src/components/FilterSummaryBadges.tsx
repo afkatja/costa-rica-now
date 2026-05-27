@@ -41,7 +41,7 @@ export function FilterSummaryBadges({
     timeFilter !== TimeFilter.All ||
     magnitudeFilter.enabled ||
     sourceFilter !== SourceFilter.All ||
-    locationFilter.enabled
+    (locationFilter.enabled && currentPosition)
 
   if (!hasActiveFilters) {
     return null
@@ -56,37 +56,53 @@ export function FilterSummaryBadges({
             {timeFilter === TimeFilter.Last3Days && t("3d")}
             {timeFilter === TimeFilter.Week && t("week")}
             {timeFilter === TimeFilter.Month && t("month")}
-            <X
+            <button
+              type="button"
               className="h-3 w-3 ml-1 cursor-pointer"
               onClick={() => onTimeFilterChange(TimeFilter.All)}
-            />
+              aria-label="Remove time filter"
+            >
+              <X className="h-3 w-3" />
+            </button>
           </Badge>
         )}
         {magnitudeFilter.enabled && (
           <Badge variant="secondary">
             M {magnitudeFilter.minimum || 5.0}+
-            <X
+            <button
+              type="button"
               className="h-3 w-3 ml-1 cursor-pointer"
               onClick={() => onMagnitudeFilterChange("all")}
-            />
+              aria-label="Remove magnitude filter"
+            >
+              <X className="h-3 w-3" />
+            </button>
           </Badge>
         )}
         {sourceFilter !== SourceFilter.All && (
           <Badge variant="secondary">
             {sourceFilter.toUpperCase()}
-            <X
+            <button
+              type="button"
               className="h-3 w-3 ml-1 cursor-pointer"
               onClick={() => onSourceFilterChange(SourceFilter.All)}
-            />
+              aria-label="Remove source filter"
+            >
+              <X className="h-3 w-3" />
+            </button>
           </Badge>
         )}
         {locationFilter.enabled && currentPosition && (
           <Badge variant="secondary">
             {t("within50km")}
-            <X
+            <button
+              type="button"
               className="h-3 w-3 ml-1 cursor-pointer"
               onClick={() => onLocationFilterToggle()}
-            />
+              aria-label="Remove location filter"
+            >
+              <X className="h-3 w-3" />
+            </button>
           </Badge>
         )}
       </div>

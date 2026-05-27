@@ -46,7 +46,8 @@ export function VolcanoesTab({
       .then(setVolcanoes)
       .catch(err => {
         console.error(err)
-        setVolcanoError(err.message)
+        const msg = err instanceof Error ? err.message : String(err)
+        setVolcanoError(msg)
         setVolcanoes([])
       })
       .finally(() => setVolcanoLoading(false))

@@ -6,13 +6,47 @@ import { SeismicMap } from "./SeismicMap"
 import { useTranslations } from "next-intl"
 import { GeolocationPosition } from "../hooks/use-geolocation"
 import Earthquakes from "./Earthquakes"
-import { SeismicFilters, SeismicFilterActions } from "../types/shared"
+import {
+  SeismicFilters,
+  SeismicFilterActions,
+  SeismicEvent,
+  SeismicEventStats,
+  SeismicResponseMetadata,
+} from "../types/shared"
 import { SEISMIC_CONFIG } from "../config/seismic"
 
+interface SeismicProperties {
+  mag: number
+  place: string
+  time: number
+  url?: string
+  tsunami?: boolean
+}
+
+interface SeismicFeature {
+  id: string
+  geometry: {
+    type: string
+    coordinates: [number, number, number?]
+  }
+  properties: SeismicProperties
+}
+
+interface SeismicData {
+  type: string
+  metadata: SeismicResponseMetadata
+  events: SeismicEvent[]
+}
+
+interface SeismicError {
+  message?: string
+  code?: number
+}
+
 interface EarthquakesTabProps {
-  seismicData: any
+  seismicData: SeismicData | null
   seismicLoading: boolean
-  seismicError: any
+  seismicError: SeismicError | null
   mutateSeismic: () => void
   currentPage: number
   onPageChange: (page: number) => void
@@ -78,7 +112,14 @@ export function EarthquakesTab({
       <Earthquakes
         earthquakes={seismicData?.events ?? []}
         totalCount={seismicData?.metadata?.stats?.total ?? 0}
-        stats={seismicData?.metadata?.stats ?? null}
+        stats={
+          seismicData?.metadata?.stats ?? {
+            total: 0,
+            sources: { usgs: 0, ovsicori: 0, rsn: 0, manual: 0 },
+            magnitudeRange: null,
+            feltCount: 0,
+          }
+        }
         currentPage={currentPage}
         itemsPerPage={SEISMIC_CONFIG.ITEMS_PER_PAGE}
         loading={seismicLoading}

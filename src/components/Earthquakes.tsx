@@ -325,7 +325,7 @@ const Earthquakes = ({
               </label>
               <Select
                 value={
-                  filters.magnitudeFilter
+                  filters.magnitudeFilter?.enabled
                     ? SEISMIC_CONFIG.MAGNITUDE_FILTER_VALUE
                     : "all"
                 }
@@ -368,7 +368,9 @@ const Earthquakes = ({
               <label className="text-sm font-medium">{t("nearby")}</label>
               <div className="space-y-2">
                 <Button
-                  variant={filters.locationFilter ? "default" : "outline"}
+                  variant={
+                    filters.locationFilter?.enabled ? "default" : "outline"
+                  }
                   size="sm"
                   onClick={handleLocationFilterToggle}
                   className="w-full"
@@ -376,7 +378,7 @@ const Earthquakes = ({
                   <Navigation className="h-4 w-4 mr-2" />
                   {currentPosition ? t("within50km") : t("enableLocation")}
                 </Button>
-                {filters.locationFilter && !currentPosition && (
+                {filters.locationFilter?.enabled && !currentPosition && (
                   <p className="text-xs text-muted-foreground">
                     {t("locationRequired")}
                   </p>
