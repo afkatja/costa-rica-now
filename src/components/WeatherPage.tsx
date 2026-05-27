@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { useTranslations } from "next-intl"
 import { useGeolocation } from "../hooks/use-geolocation"
 import { useWeatherData, WeatherData } from "../providers/WeatherDataProvider"
+import { useWeatherPage } from "../hooks/useWeatherData"
 import {
   Droplets,
   MapPin,
@@ -110,10 +111,10 @@ export function WeatherPage() {
   // Use Weather Data Provider
   const {
     weatherData: allWeatherData,
-    loading: providerLoading,
-    errors: providerErrors,
     refreshWeather,
-  } = useWeatherData()
+    loading,
+    error,
+  } = useWeatherPage()
 
   const {
     position,
@@ -203,8 +204,8 @@ export function WeatherPage() {
               (position && isInCostaRica ? "closest" : "san-jose"),
           ) || allWeatherData?.[0]
         }
-        weatherLoading={providerLoading.weather}
-        weatherError={providerErrors.weather}
+        weatherLoading={loading}
+        weatherError={error}
         fetchWeatherData={refreshWeather}
         locationName={locationName}
       />

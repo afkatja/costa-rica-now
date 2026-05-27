@@ -10,55 +10,36 @@ type TideExtreme = {
   type: "high" | "low"
 }
 
-type BeachConditions = {
-  destinationId: string
-  destination: string
-  name: string
-  lat: number
-  lon: number
-  region: string
-  tides: {
-    extremes: TideExtreme[]
-    nextHigh: TideExtreme | null
-    nextLow: TideExtreme | null
-    currentTide: "rising" | "falling" | null
-  }
-  waves: {
-    current: {
-      height: number
-      direction: number
-      time: string
-    }
-    forecast: Array<{
-      time: string
-      height: number
-      direction: number
-    }>
-    average24h: number
-    max24h: number
-  }
-  surfConditions: "excellent" | "good" | "fair" | "poor"
-  lastUpdated: string
-}
+import { BeachConditions } from "@/types/beach"
 
 // Fetch tides from Marea API
 async function fetchTides(lat: number, lon: number) {
   try {
+    const apiKey = process.env.MAREA_API_KEY
+
     const response = await fetch(
       `https://api.marea.ooo/v2/tides?latitude=${lat}&longitude=${lon}`,
       {
         headers: {
-          "x-marea-api-token": process.env.MAREA_API_KEY!,
+          "x-marea-api-token": apiKey!,
         },
       },
     )
-
     if (!response.ok) {
-      console.error(`Marea API error: ${response.status}`)
+      // Handle quota exceeded - stop trying
+      if (response.status === 403) {
+        console.log("Marea API quota exceeded - skipping tide data")
+        return "QUOTA_EXCEEDED"
+      }
+
+      console.error(
+        `Marea API error: ${response.status} ${response.statusText}`,
+      )
       return null
     }
 
     const data = await response.json()
+    console.log("Marea API response:", data)
     return data
   } catch (error) {
     console.error("Error fetching tides:", error)
@@ -66,14 +47,16 @@ async function fetchTides(lat: number, lon: number) {
   }
 }
 
-// Fetch waves from Open-Meteo Marine API
-async function fetchWaves(lat: number, lon: number) {
+// Fetch detailed marine data from Open-Meteo Marine API
+async function fetchMarineData(lat: number, lon: number) {
   try {
     const params = new URLSearchParams({
       latitude: lat.toString(),
       longitude: lon.toString(),
+      current:
+        "wave_height,wave_direction,wave_period,wave_peak_period,wind_wave_height,wind_wave_direction,wind_wave_period,wind_wave_peak_period,swell_wave_height,swell_wave_direction,swell_wave_period,swell_wave_peak_period,sea_level_height_msl,ocean_current_velocity,ocean_current_direction",
       hourly: "wave_height,wave_direction,wave_period",
-      forecast_days: "2",
+      forecast_days: "1",
     })
 
     const response = await fetch(
@@ -81,20 +64,31 @@ async function fetchWaves(lat: number, lon: number) {
     )
 
     if (!response.ok) {
-      console.error(`Open-Meteo API error: ${response.status}`)
+      console.error(`Open-Meteo Marine API error: ${response.status}`)
       return null
     }
 
     const data = await response.json()
     return data
   } catch (error) {
-    console.error("Error fetching waves:", error)
+    console.error("Error fetching marine data:", error)
     return null
   }
 }
 
 // Process tide data to find next high/low and current trend
 function processTideData(tideData: any) {
+  // Handle quota exceeded case
+  if (tideData === "QUOTA_EXCEEDED") {
+    console.log("Skipping tide processing due to quota exceeded")
+    return {
+      extremes: [],
+      nextHigh: null,
+      nextLow: null,
+      currentTide: null,
+    }
+  }
+
   if (!tideData?.extremes) {
     return {
       extremes: [],
@@ -108,7 +102,7 @@ function processTideData(tideData: any) {
   const extremes: TideExtreme[] = tideData.extremes.map((e: any) => ({
     time: e.datetime,
     height: e.height,
-    type: e.type === "HIGH" ? "high" : "low",
+    type: e.state === "HIGH TIDE" ? "high" : "low",
   }))
 
   // Find next high and low
@@ -116,10 +110,15 @@ function processTideData(tideData: any) {
   const nextHigh = futureExtremes.find(e => e.type === "high") || null
   const nextLow = futureExtremes.find(e => e.type === "low") || null
 
-  // Determine if tide is rising or falling
+  // Determine current tide state from heights data
   let currentTide: "rising" | "falling" | null = null
-  if (futureExtremes.length > 0) {
-    currentTide = futureExtremes[0].type === "high" ? "rising" : "falling"
+  if (tideData.heights && tideData.heights.length > 0) {
+    const currentHeight = tideData.heights[0]
+    if (currentHeight.state === "RISING") {
+      currentTide = "rising"
+    } else if (currentHeight.state === "FALLING") {
+      currentTide = "falling"
+    }
   }
 
   return {
@@ -130,9 +129,9 @@ function processTideData(tideData: any) {
   }
 }
 
-// Process wave data
-function processWaveData(waveData: any) {
-  if (!waveData?.hourly) {
+// Process marine data from Open-Meteo
+function processWaveData(marineData: any) {
+  if (!marineData?.hourly) {
     return {
       current: { height: 0, direction: 0, time: new Date().toISOString() },
       forecast: [],
@@ -141,19 +140,21 @@ function processWaveData(waveData: any) {
     }
   }
 
-  const { time, wave_height, wave_direction } = waveData.hourly
+  const { time, wave_height, wave_direction } = marineData.hourly
 
   // Create forecast array
   const forecast = time.slice(0, 48).map((t: string, i: number) => ({
     time: t,
     height: wave_height[i] || 0,
     direction: wave_direction[i] || 0,
+    directionCardinal: degreesToCardinal(wave_direction[i] || 0),
   }))
 
   // Current conditions (first data point)
   const current = {
     height: wave_height[0] || 0,
     direction: wave_direction[0] || 0,
+    directionCardinal: degreesToCardinal(wave_direction[0] || 0),
     time: time[0],
   }
 
@@ -174,6 +175,30 @@ function processWaveData(waveData: any) {
     average24h: Math.round(average24h * 10) / 10,
     max24h: Math.round(max24h * 10) / 10,
   }
+}
+
+// Convert degrees to cardinal direction
+function degreesToCardinal(degrees: number): string {
+  const directions = [
+    "N",
+    "NNE",
+    "NE",
+    "ENE",
+    "E",
+    "ESE",
+    "SE",
+    "SSE",
+    "S",
+    "SSW",
+    "SW",
+    "WSW",
+    "W",
+    "WNW",
+    "NW",
+    "NNW",
+  ]
+  const index = Math.round(degrees / 22.5) % 16
+  return directions[index]
 }
 
 // Determine surf conditions based on wave height
@@ -205,14 +230,14 @@ export async function GET(request: NextRequest) {
         )
       }
 
-      const [tideData, waveData] = await Promise.all([
+      const [tideData, marineData] = await Promise.all([
         fetchTides(destination.lat, destination.lon),
-        fetchWaves(destination.lat, destination.lon),
+        fetchMarineData(destination.lat, destination.lon),
       ])
 
       const tides = processTideData(tideData)
 
-      const waves = processWaveData(waveData)
+      const waves = processWaveData(marineData)
 
       const conditions: BeachConditions = {
         destinationId: destination.id,
@@ -238,13 +263,13 @@ export async function GET(request: NextRequest) {
       const batchResults = await Promise.all(
         batch.map(async destination => {
           try {
-            const [tideData, waveData] = await Promise.all([
+            const [tideData, marineData] = await Promise.all([
               fetchTides(destination.lat, destination.lon),
-              fetchWaves(destination.lat, destination.lon),
+              fetchMarineData(destination.lat, destination.lon),
             ])
 
             const tides = processTideData(tideData)
-            const waves = processWaveData(waveData)
+            const waves = processWaveData(marineData)
 
             const conditions: BeachConditions = {
               destinationId: destination.id,

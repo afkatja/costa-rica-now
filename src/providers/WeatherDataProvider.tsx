@@ -44,7 +44,7 @@ interface RadarData {
   lastUpdated: string | null
 }
 
-interface TideData {
+export interface TideData {
   location: string
   name: string
   region: string
@@ -55,6 +55,15 @@ interface TideData {
   currentTide: "rising" | "falling" | null
   waveHeight: number | null
   waveDirection: number | null
+  waveDirectionCardinal: string | null
+  waveForecast: Array<{
+    time: string
+    height: number
+    direction: number
+    directionCardinal: string
+  }> | null
+  waveAverage24h: number | null
+  waveMax24h: number | null
   surfConditions: "excellent" | "good" | "fair" | "poor" | null
   lastUpdated: string | null
 }
@@ -122,7 +131,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
       string,
       [
         string,
-        (typeof costaRicaDestinations)[keyof typeof costaRicaDestinations]
+        (typeof costaRicaDestinations)[keyof typeof costaRicaDestinations],
       ]
     >()
     Object.entries(costaRicaDestinations).forEach(([key, dest]) => {
@@ -148,19 +157,19 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
             locations: allLocationKeys,
             types: ["current"],
           },
-        }
+        },
       )
 
       if (response.error) {
         throw new Error(
-          `Weather service error: ${response.error.message ?? response.error}`
+          `Weather service error: ${response.error.message ?? response.error}`,
         )
       }
 
       const result = response.data?.data
       if (result?.weather) {
         const currentWeather = result.weather.filter(
-          (w: any) => w.type === "current"
+          (w: any) => w.type === "current",
         )
         setWeatherData(currentWeather)
       }
@@ -187,7 +196,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
 
       if (!radarResponse.ok) {
         throw new Error(
-          `HTTP ${radarResponse.status}: ${radarResponse.statusText}`
+          `HTTP ${radarResponse.status}: ${radarResponse.statusText}`,
         )
       }
 
@@ -204,7 +213,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
           lastUpdated: radarStatus.timestamp
             ? new Date(radarStatus.timestamp).toISOString()
             : null,
-        })
+        }),
       )
 
       setRadarData(radarRegionalData)
@@ -229,11 +238,12 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
       const tidesPromises = coastalDestinations.map(async locationKey => {
         try {
           const response = await fetch(
-            `/api/beaches?destination=${encodeURIComponent(locationKey.id)}`
+            `/api/beaches?destination=${encodeURIComponent(locationKey.id)}`,
           )
           if (!response.ok) return null
 
           const beachData = await response.json()
+          console.log({ beachData })
 
           return {
             location: locationKey.id,
@@ -246,6 +256,11 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
             currentTide: beachData?.tides?.currentTide || null,
             waveHeight: beachData?.waves?.current?.height || null,
             waveDirection: beachData?.waves?.current?.direction || null,
+            waveDirectionCardinal:
+              beachData?.waves?.current?.directionCardinal || null,
+            waveForecast: beachData?.waves?.forecast || null,
+            waveAverage24h: beachData?.waves?.average24h || null,
+            waveMax24h: beachData?.waves?.max24h || null,
             surfConditions: beachData?.surfConditions || null,
             lastUpdated: beachData?.lastUpdated || null,
           } as TideData
@@ -270,16 +285,6 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
       setLoading(prev => ({ ...prev, tides: false }))
     }
   }
-
-  // // Fetch all data
-  // const fetchAllData = async () => {
-  //   await Promise.all([refreshWeather(), refreshRadar(), refreshTides()])
-  // }
-
-  // // Initial data fetch
-  // useEffect(() => {
-  //   fetchAllData()
-  // }, [])
 
   const value: WeatherDataContextType = {
     weatherData,

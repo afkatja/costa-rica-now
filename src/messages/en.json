@@ -41,6 +41,8 @@
     "forecast7Days": "7-day forecast",
     "rainMaps": "Rain maps",
     "weatherAlerts": "Weather alerts",
+    "seaMap": "Sea Map",
+    "seaConditions": "Sea Conditions",
     "temperatureLegend": {
       "hot": "30°C+",
       "warm": "25-29°C",
@@ -55,6 +57,7 @@
       "updated": "Updated",
       "coastalConditions": "Coastal Conditions",
       "waves": "waves",
+      "waveDirection": "wave direction",
       "surf": "Surf",
       "tide": "Tide",
       "noData": "No data available for {tab} tab"
