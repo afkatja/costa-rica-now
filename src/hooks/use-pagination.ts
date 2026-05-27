@@ -23,9 +23,10 @@ export function usePagination({
   itemsPerPage,
 }: UsePaginationProps): UsePaginationReturn {
   const paginationData = useMemo(() => {
-    const totalPages = Math.ceil(totalCount / itemsPerPage)
-    const startIndex = (currentPage - 1) * itemsPerPage
-    const endIndex = startIndex + itemsPerPage
+    const safeItemsPerPage = Math.max(1, itemsPerPage)
+    const totalPages = Math.ceil(totalCount / safeItemsPerPage)
+    const startIndex = (currentPage - 1) * safeItemsPerPage
+    const endIndex = startIndex + safeItemsPerPage
 
     // Generate pagination pages with ellipsis
     const getPaginationPages = (): (number | string)[] => {
@@ -47,7 +48,12 @@ export function usePagination({
       } else if (currentPage >= totalPages - 3) {
         // Near the end
         pages.push("...")
-        pages.push(totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1)
+        pages.push(
+          totalPages - 4,
+          totalPages - 3,
+          totalPages - 2,
+          totalPages - 1,
+        )
       } else {
         // In the middle
         pages.push("...")

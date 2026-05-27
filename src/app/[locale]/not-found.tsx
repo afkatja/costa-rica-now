@@ -1,7 +1,9 @@
 import React from "react"
-import Link from "next/link"
+import { createNavigation } from "next-intl/navigation"
 
 const NotFound = () => {
+  const { Link } = createNavigation()
+
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">

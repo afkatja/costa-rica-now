@@ -21,6 +21,22 @@ export interface ApiResponseAdapter<T, R> {
 // SEISMIC DATA ADAPTERS
 // =============================================================================
 
+// Stats interface for seismic data
+export interface SeismicResponseStats {
+  magnitudeRange?: { min: number; max: number }
+  feltCount?: number
+  magnitudeDistribution?: Record<string, number>
+  timeRange?: { start: number; end: number }
+  sourceCount?: Record<string, number>
+}
+
+// Transform result interface
+export interface SeismicTransformResult {
+  events: SeismicEvent[]
+  totalCount: number
+  stats?: SeismicResponseStats
+}
+
 // Raw API response types (these can change without affecting components)
 interface RawSeismicEvent {
   id: string
@@ -36,6 +52,7 @@ interface RawSeismicEvent {
   felt?: number
   formattedDateTime?: string
   formattedTime?: string
+  tsunami?: boolean
 }
 
 interface RawSeismicResponse {
@@ -69,7 +86,7 @@ export class SeismicEventAdapter implements ApiResponseAdapter<
       felt: raw.felt,
       formattedDateTime: raw.formattedDateTime,
       formattedTime: raw.formattedTime,
-      tsunami: false, // Default value, can be updated if needed
+      tsunami: raw.tsunami ?? false, // Preserve incoming value when present
     }
   }
 
@@ -104,15 +121,11 @@ export class SeismicEventAdapter implements ApiResponseAdapter<
 
 export class SeismicResponseAdapter implements ApiResponseAdapter<
   RawSeismicResponse,
-  { events: SeismicEvent[]; totalCount: number; stats?: any }
+  SeismicTransformResult
 > {
   private eventAdapter = new SeismicEventAdapter()
 
-  transform(raw: RawSeismicResponse): {
-    events: SeismicEvent[]
-    totalCount: number
-    stats?: any
-  } {
+  transform(raw: RawSeismicResponse): SeismicTransformResult {
     if (!raw.success || !raw.data) {
       throw new Error(raw.error || "Failed to fetch seismic data")
     }
@@ -269,7 +282,7 @@ interface RawWeatherData {
   humidity: number
   windSpeed: number
   description: string
-  timestamp: number
+  timestamp: number | string
 }
 
 export class WeatherDataAdapter implements ApiResponseAdapter<

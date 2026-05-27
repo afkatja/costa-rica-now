@@ -56,9 +56,18 @@ export function SeismicPage() {
       number,
       {
         timeFilter?: TimeFilter
-        magnitudeFilter?: boolean
+        magnitudeFilter?: {
+          enabled: boolean
+          minimum?: number
+          maximum?: number
+        }
         sourceFilter?: SourceFilter
-        locationFilter?: boolean
+        locationFilter?: {
+          enabled: boolean
+          latitude?: number
+          longitude?: number
+          radiusKm?: number
+        }
         latitude?: number
         longitude?: number
       },
@@ -94,13 +103,13 @@ export function SeismicPage() {
       limit: SEISMIC_CONFIG.ITEMS_PER_PAGE,
       offset,
     }
-    if (filters?.magnitudeFilter) {
+    if (filters?.magnitudeFilter?.enabled) {
       requestBody.minMagnitude = SEISMIC_CONFIG.MIN_MAGNITUDE_FILTER
     }
     if (filters?.sourceFilter && filters.sourceFilter !== SourceFilter.All) {
       requestBody.source = filters.sourceFilter
     }
-    if (filters?.locationFilter && position) {
+    if (filters?.locationFilter?.enabled && position) {
       requestBody.lat = position.latitude
       requestBody.lon = position.longitude
       requestBody.radiusKm = SEISMIC_CONFIG.LOCATION_RADIUS_KM
