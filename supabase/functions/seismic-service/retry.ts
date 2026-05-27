@@ -34,9 +34,10 @@ export class RetryError extends Error {
 /**
  * Default retry condition - retry on network errors and 5xx status codes
  */
-function defaultShouldRetry(error: Error, attempt: number): boolean {
-  // Don't retry if we've exceeded max attempts
-  if (attempt >= RETRY_CONFIG.MAX_ATTEMPTS) {
+function defaultShouldRetry(error: Error, attempt: number, maxAttempts?: number): boolean {
+  // Don't retry if we've exceeded max attempts (use provided override or default)
+  const effectiveMaxAttempts = maxAttempts ?? RETRY_CONFIG.MAX_ATTEMPTS
+  if (attempt >= effectiveMaxAttempts) {
     return false
   }
 
@@ -96,10 +97,10 @@ function sleep(ms: number): Promise<void> {
 /**
  * Create an AbortController with timeout
  */
-function createTimeoutController(timeoutMs: number): AbortController {
+function createTimeoutController(timeoutMs: number): { controller: AbortController; timeoutId: NodeJS.Timeout } {
   const controller = new AbortController()
-  setTimeout(() => controller.abort(), timeoutMs)
-  return controller
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  return { controller, timeoutId }
 }
 
 /**
@@ -132,15 +133,16 @@ export async function fetchWithRetry(
       )
 
       // Create timeout controller for this attempt
-      const controller = createTimeoutController(timeoutMs)
+      const { controller, timeoutId } = createTimeoutController(timeoutMs)
 
-      const response = await fetch(url, {
-        method,
-        headers,
-        body,
-        redirect,
-        signal: controller.signal,
-      })
+      try {
+        const response = await fetch(url, {
+          method,
+          headers,
+          body,
+          redirect,
+          signal: controller.signal,
+        })
 
       // Check if response is successful
       if (!response.ok) {
@@ -168,6 +170,9 @@ export async function fetchWithRetry(
       )
       return response
     } catch (error) {
+      // Clear timeout on error
+      clearTimeout(timeoutId)
+      
       lastError = error instanceof Error ? error : new Error(String(error))
       errors.push(lastError)
 
@@ -177,9 +182,19 @@ export async function fetchWithRetry(
       )
 
       // Check if we should retry
-      if (!shouldRetry(lastError, attempt) || attempt === maxAttempts) {
+      if (!shouldRetry(lastError, attempt, maxAttempts) || attempt === maxAttempts) {
         break
       }
+      // Clear timeout on error
+      clearTimeout(timeoutId)
+      
+      lastError = error instanceof Error ? error : new Error(String(error))
+      errors.push(lastError)
+
+      console.error(
+        `[retry] Attempt ${attempt} failed for ${url}:`,
+        lastError.message,
+      )
 
       // Calculate delay and wait
       const delay = calculateDelay(
@@ -193,6 +208,9 @@ export async function fetchWithRetry(
       )
       await sleep(delay)
     }
+  } catch (error) {
+    console.error(`[retry] Unexpected error for ${url}:`, error)
+    throw error
   }
 
   // All attempts failed

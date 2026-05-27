@@ -230,6 +230,44 @@ function cleanOvsicoriCell(cell: string): string {
 }
 
 /**
+ * Parse OVSICORI date and time components into UTC timestamp
+ */
+function parseOvsicoriDateTime(date: string, time: string): number {
+  // Parse date components (format: DD/MM/YYYY)
+  const dateParts = date.split("/")
+  const day = parseInt(dateParts[0], 10)
+  const month = parseInt(dateParts[1], 10)
+  const year = parseInt(dateParts[2], 10)
+
+  // Parse time components (format: HH:MM:SS with optional fractional seconds)
+  const timeParts = time.split(":")
+  let hour = parseInt(timeParts[0], 10)
+  let minute = parseInt(timeParts[1], 10)
+  let second = 0
+  let millisecond = 0
+
+  if (timeParts.length >= 3) {
+    const secondParts = timeParts[2].split(".")
+    second = parseInt(secondParts[0], 10)
+    if (secondParts.length > 1) {
+      millisecond = Math.floor(parseFloat(`0.${secondParts[1]}`) * 1000)
+    }
+  }
+
+  // Build UTC timestamp and apply -6 hour offset (Costa Rica time)
+  const utcTime = Date.UTC(
+    year,
+    month - 1,
+    day,
+    hour,
+    minute,
+    second,
+    millisecond,
+  )
+  return utcTime - 6 * 60 * 60 * 1000 // Subtract 6 hours
+}
+
+/**
  * Create an OVSICORI event object
  */
 function createOvsicoriEvent(data: {
@@ -265,7 +303,7 @@ function createOvsicoriEvent(data: {
     lat: latitude,
     lon: longitude,
     depth,
-    time: new Date(`${date} ${time} UTC-6`).getTime(),
+    time: parseOvsicoriDateTime(date, time),
     felt,
     tsunami: false,
     status: author,
@@ -331,7 +369,7 @@ function parseRSNEvent(
       felt: undefined,
       intensity: undefined,
       tsunami: false,
-      url: `http://www.isc.ac.uk/iscbulletin/search/event/${id}`,
+      url: `https://www.isc.ac.uk/iscbulletin/search/event/${id}`,
       status: "reviewed",
       isRsnRelated,
       networks,
