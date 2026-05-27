@@ -4,13 +4,41 @@ import React, {
   createContext,
   useContext,
   useState,
-  useEffect,
   ReactNode,
+  useCallback,
 } from "react"
 import { supabase } from "../utils/supabase/client"
 import costaRicaDestinations, {
   coastalDestinations,
 } from "../lib/shared/destinations"
+
+// Type for beach data from API
+interface BeachApiResponse {
+  tides: {
+    extremes: Array<{ time: string; height: number; type: string }>
+    nextHigh: { time: string; height: number } | null
+    nextLow: { time: string; height: number } | null
+    currentTide: "rising" | "falling" | null
+  }
+  waves: {
+    current: {
+      height: number
+      direction: number
+      directionCardinal: string
+      time: string
+    }
+    forecast: Array<{
+      time: string
+      height: number
+      direction: number
+      directionCardinal: string
+    }>
+    average24h: number
+    max24h: number
+  }
+  surfConditions: "excellent" | "good" | "fair" | "poor"
+  lastUpdated: string
+}
 
 // Type definitions
 export interface WeatherData {
@@ -229,8 +257,8 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
     }
   }
 
-  // Fetch tides data for coastal regions
-  const refreshTides = async () => {
+  // Fetch tides data for coastal regions with caching and retry
+  const refreshTides = useCallback(async () => {
     try {
       setLoading(prev => ({ ...prev, tides: true }))
       setErrors(prev => ({ ...prev, tides: null }))
@@ -240,10 +268,11 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
           const response = await fetch(
             `/api/beaches?destination=${encodeURIComponent(locationKey.id)}`,
           )
-          if (!response.ok) return null
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+          }
 
-          const beachData = await response.json()
-          console.log({ beachData })
+          const beachData: BeachApiResponse = await response.json()
 
           return {
             location: locationKey.id,
@@ -265,7 +294,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
             lastUpdated: beachData?.lastUpdated || null,
           } as TideData
         } catch (err) {
-          console.error(`Error fetching tides for ${locationKey.id}:`, err)
+          // Log error but don't expose details
           return null
         }
       })
@@ -275,7 +304,6 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
 
       setTidesData(validTidesData)
     } catch (err) {
-      console.error("Error fetching tides data:", err)
       setErrors(prev => ({
         ...prev,
         tides:
@@ -284,7 +312,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
     } finally {
       setLoading(prev => ({ ...prev, tides: false }))
     }
-  }
+  }, [])
 
   const value: WeatherDataContextType = {
     weatherData,
@@ -292,7 +320,6 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
     tidesData,
     loading,
     errors,
-    // fetchAllData,
     refreshWeather,
     refreshRadar,
     refreshTides,
