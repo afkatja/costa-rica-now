@@ -12,8 +12,8 @@ export enum TabOfSea {
 import { useSeaPage } from "../hooks/useWeatherData"
 
 export function SeaPage() {
-  const t = useTranslations("WeatherPage") // Reusing WeatherPage translations for now
-  const r = useTranslations("WeatherPage.regionalWeather") // Reusing WeatherPage translations for now
+  const t = useTranslations("SeaPage") // Use dedicated SeaPage translations
+  const r = useTranslations("SeaPage.coastalConditions") // Use dedicated coastal conditions translations
   const { tidesData, refreshTides, loading, error } = useSeaPage()
 
   const regionalData = tidesData
@@ -35,9 +35,17 @@ export function SeaPage() {
         <button
           onClick={refreshTides}
           disabled={loading}
-          className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+          className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
+          aria-label={loading ? "Refreshing sea data" : "Refresh sea data"}
         >
-          {loading ? "Loading..." : "Refresh"}
+          {loading ? (
+            <>
+              <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+              {t("loading") || "Loading..."}
+            </>
+          ) : (
+            <>{t("refresh") || "Refresh"}</>
+          )}
         </button>
       </div>
       {/* Error display */}
@@ -61,7 +69,25 @@ export function SeaPage() {
             </div>
           ) : (
             <div className="h-[700px] flex items-center justify-center">
-              {loading ? "Loading sea data..." : "No sea data available"}
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 mx-auto bg-gray-200 rounded-full flex items-center justify-center">
+                  <Waves className="w-8 h-8 text-gray-400" />
+                </div>
+                <p className="text-muted-foreground">
+                  {loading
+                    ? t("loadingData") || "Loading sea data..."
+                    : t("noDataAvailable") || "No sea data available"}
+                </p>
+                {!loading && (
+                  <button
+                    onClick={refreshTides}
+                    className="text-sm text-primary hover:underline"
+                    aria-label="Try loading sea data again"
+                  >
+                    {t("tryAgain") || "Try again"}
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </CardContent>
@@ -84,6 +110,7 @@ export function SeaPage() {
                   className={`p-4 rounded-lg border ${item.type}`}
                 >
                   <h5 className="font-medium mb-2">
+                    <span className="sr-only">Location:</span>
                     {item.name} - {item.region}
                   </h5>
                   <>
@@ -119,7 +146,16 @@ export function SeaPage() {
               ))
             ) : (
               <div className="col-span-full text-center text-muted-foreground py-8">
-                {r("noData", { tab: "sea conditions" })}
+                <div className="space-y-2">
+                  <p>{r("noData") || "No coastal data available"}</p>
+                  <button
+                    onClick={refreshTides}
+                    className="text-sm text-primary hover:underline"
+                    aria-label="Refresh coastal data"
+                  >
+                    {t("refreshData") || "Refresh data"}
+                  </button>
+                </div>
               </div>
             )}
           </div>

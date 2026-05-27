@@ -55,12 +55,28 @@
       "active": "Active",
       "unavailable": "Unavailable",
       "updated": "Updated",
-      "coastalConditions": "Coastal Conditions",
-      "waves": "waves",
-      "waveDirection": "wave direction",
       "surf": "Surf",
       "tide": "Tide",
       "noData": "No data available for {tab} tab"
+    }
+  },
+  "SeaPage": {
+    "title": "Sea Conditions in Costa Rica",
+    "currentConditions": "Current Conditions for",
+    "lastUpdated": "Last updated",
+    "noData": "No data available",
+    "seaConditions": "Sea Conditions",
+    "refresh": "Refresh",
+    "loading": "Loading...",
+    "loadingData": "Loading data...",
+    "refreshData": "Refresh data",
+    "coastalConditions": {
+      "waveHeight": "Wave Height",
+      "waveDirection": "Wave Direction",
+      "surf": "Surf",
+      "tide": "Tide",
+      "waves": "waves",
+      "coastalConditions": "Coastal Conditions"
     }
   },
   "SeismicPage": {
