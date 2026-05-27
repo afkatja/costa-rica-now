@@ -1,9 +1,9 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
-import Image from "next/image"
 import MapTooltipContent from "./MapTooltipContent"
 import { useSeaPage } from "../hooks/useWeatherData"
+import { Waves, Droplets } from "lucide-react"
 
 type BeachLocation = {
   id: string
@@ -72,7 +72,16 @@ const TidesInfoWindow = ({ beach }: { beach: BeachLocation }) => {
           description: "Loading tides and waves...",
         }}
       >
-        <div className="p-2">Loading...</div>
+        <div className="p-4 space-y-3">
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+          </div>
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+          </div>
+        </div>
       </MapTooltipContent>
     )
   }
@@ -85,8 +94,15 @@ const TidesInfoWindow = ({ beach }: { beach: BeachLocation }) => {
           description: "Tides and waves",
         }}
       >
-        <div className="p-2 text-sm text-red-600">
-          {error ? `Error: ${error}` : "No data available"}
+        <div className="p-4">
+          <div className="flex items-center gap-2 text-sm text-amber-600">
+            <Droplets className="h-4 w-4" />
+            <span>
+              {error
+                ? "Unable to load marine data. Please try again later."
+                : "No marine data available for this location."}
+            </span>
+          </div>
         </div>
       </MapTooltipContent>
     )
@@ -101,7 +117,7 @@ const TidesInfoWindow = ({ beach }: { beach: BeachLocation }) => {
   return (
     <MapTooltipContent
       data={{
-        icon: "https://static.vecteezy.com/system/resources/previews/059/837/606/non_2x/ocean-waves-icon-water-symbol-sea-waves-wave-water-ripple-line-vector.jpg",
+        icon: "https://openweathermap.org/img/wn/03d@2x.png", // Scattered clouds icon for marine conditions
         description: `Region: ${beachData.region}`,
       }}
     >
@@ -109,12 +125,7 @@ const TidesInfoWindow = ({ beach }: { beach: BeachLocation }) => {
         {beachData.waveHeight && (
           <div className="mb-3">
             <div className="flex items-center gap-2 mb-1">
-              <Image
-                src="https://static.vecteezy.com/system/resources/previews/059/838/535/non_2x/ocean-waves-icon-water-symbol-graphic-sea-waves-wave-water-ripple-flow-water-splash-shape-vector.jpg"
-                alt="Waves"
-                width={40}
-                height={40}
-              />
+              <Waves className="h-8 w-8 text-blue-500" />
               <span className="font-semibold">Waves</span>
             </div>
             <p className="text-sm">
@@ -138,12 +149,7 @@ const TidesInfoWindow = ({ beach }: { beach: BeachLocation }) => {
           <>
             <div className="mb-3 pt-2 border-t">
               <div className="flex items-center gap-2 mb-1">
-                <Image
-                  src="https://static.vecteezy.com/system/resources/previews/036/666/679/non_2x/wave-free-vector.png"
-                  alt="Tides"
-                  width={30}
-                  height={30}
-                />
+                <Droplets className="h-6 w-6 text-cyan-500" />
                 <span className="font-semibold">Tides</span>
               </div>
               {beachData.nextHigh && (
