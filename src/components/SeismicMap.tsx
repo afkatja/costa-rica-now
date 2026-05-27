@@ -5,6 +5,7 @@ import GoogleMapsWrapper from "./GoogleMapsWrapper"
 import { MapErrorBoundary } from "./MapErrorBoundary"
 import { useTranslations } from "next-intl"
 import { SeismicEvent } from "../types/seismic"
+import { Volcano } from "../types/volcano"
 import { useMapPins } from "../utils/pin-calculator"
 import { getMagnitudeColorScheme } from "../utils/color-scheme"
 import { formatDateTime } from "../utils/date-formatter"
@@ -13,7 +14,7 @@ export function SeismicMap({
   locations,
   type,
 }: {
-  locations: SeismicEvent[] | any[] | null
+  locations: SeismicEvent[] | Volcano[] | null
   type: "earthquake" | "volcano"
 }) {
   const t = useTranslations("SeismicMap")
@@ -59,7 +60,7 @@ export function SeismicMap({
             <div className="flex items-center gap-1">
               <span>
                 {t("depth")}:{" "}
-                {(loc as SeismicEvent).depth
+                {(loc as SeismicEvent).depth != null
                   ? `${(loc as SeismicEvent).depth} ${t("km")}`
                   : t("unknown")}
               </span>
@@ -77,16 +78,16 @@ export function SeismicMap({
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div>
-              {t("alert")}: {(loc as any).alertLevel}
+              {t("alert")}: {(loc as Volcano).alertLevel}
             </div>
             <div>
-              {t("status")}: {(loc as any).computedStatus}
+              {t("status")}: {(loc as Volcano).computedStatus}
             </div>
             <div>
-              {t("elevation")}: {(loc as any).elevation}
+              {t("elevation")}: {(loc as Volcano).elevation}
             </div>
             <div>
-              {t("lastEruption")}: {(loc as any).computedEruptionTime}
+              {t("lastEruption")}: {(loc as Volcano).computedEruptionTime}
             </div>
           </div>
         </>

@@ -110,15 +110,16 @@ export function WeatherDisplay({
               key={w.location}
               className={cn(
                 "flex items-center gap-2 px-3 py-2 rounded-lg text-gray-50 text-sm",
-                `bg-gradient-to-r ${getBackgroundGradient(w.current.main)}`,
+                `bg-linear-to-r ${getBackgroundGradient(w.current.main)}`,
               )}
             >
               {getWeatherIcon(w.current.main)}
               <span className="font-medium">{w.name}</span>
               <span
-                className={`${getTemperatureColor(
-                  w.current.temperature,
-                )} font-bold`}
+                className={cn(
+                  getTemperatureColor(w.current.temperature),
+                  "font-bold",
+                )}
               >
                 {w.current.temperature}°C
               </span>
