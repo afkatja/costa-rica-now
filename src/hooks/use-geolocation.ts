@@ -1,4 +1,11 @@
 import { useState, useEffect, useCallback } from "react"
+import {
+  REGION_CONFIG,
+  getTimeout,
+  BUSINESS_CONFIG,
+  FEATURE_FLAGS,
+  API_CONFIG,
+} from "../config/app"
 
 interface GeolocationPosition {
   latitude: number
@@ -20,13 +27,8 @@ interface GeolocationOptions {
   maximumAge?: number
 }
 
-// Costa Rica approximate bounds
-const COSTA_RICA_BOUNDS = {
-  north: 11.2,
-  south: 8.0,
-  east: -82.5,
-  west: -85.9,
-}
+// Costa Rica approximate bounds from centralized config
+const COSTA_RICA_BOUNDS = REGION_CONFIG.COSTA_RICA.bounds
 
 // Function to check if coordinates are within Costa Rica
 const isWithinCostaRica = (lat: number, lng: number): boolean => {
@@ -43,9 +45,9 @@ const calculateDistance = (
   lat1: number,
   lon1: number,
   lat2: number,
-  lon2: number
+  lon2: number,
 ): number => {
-  const R = 6371 // Radius of the Earth in kilometers
+  const R = BUSINESS_CONFIG.EARTH_RADIUS_KM // Radius of the Earth in kilometers
   const dLat = ((lat2 - lat1) * Math.PI) / 180
   const dLon = ((lon2 - lon1) * Math.PI) / 180
   const a =
@@ -110,17 +112,20 @@ export function useGeolocation(options: GeolocationOptions = {}) {
               reject(error)
             },
             {
-              enableHighAccuracy: options.enableHighAccuracy ?? true,
-              timeout: options.timeout ?? 10000,
-              maximumAge: options.maximumAge ?? 300000, // 5 minutes
-            }
+              enableHighAccuracy:
+                options.enableHighAccuracy ??
+                FEATURE_FLAGS.enableHighAccuracyGeolocation,
+              timeout: options.timeout ?? getTimeout("geolocation"),
+              maximumAge:
+                options.maximumAge ?? API_CONFIG.cache.geolocationMaximumAge,
+            },
           )
-        }
+        },
       )
 
       const isInCostaRica = isWithinCostaRica(
         position.latitude,
-        position.longitude
+        position.longitude,
       )
       const permission = await checkPermission()
 
@@ -163,19 +168,23 @@ export function useGeolocation(options: GeolocationOptions = {}) {
 
   // Check if location is within specified radius of a point
   const isWithinRadius = useCallback(
-    (targetLat: number, targetLng: number, radiusKm: number = 100) => {
+    (
+      targetLat: number,
+      targetLng: number,
+      radiusKm: number = REGION_CONFIG.COSTA_RICA.defaultRadius,
+    ) => {
       if (!state.position) return false
 
       const distance = calculateDistance(
         state.position.latitude,
         state.position.longitude,
         targetLat,
-        targetLng
+        targetLng,
       )
 
       return distance <= radiusKm
     },
-    [state.position]
+    [state.position],
   )
 
   // Get location-based context for queries
@@ -189,7 +198,7 @@ export function useGeolocation(options: GeolocationOptions = {}) {
       longitude: state.position.longitude,
       accuracy: state.position.accuracy,
       isInCostaRica: state.isInCostaRica,
-      radiusKm: 100, // Default radius for filtering
+      radiusKm: REGION_CONFIG.COSTA_RICA.defaultRadius, // Default radius for filtering
     }
   }, [state.position, state.isInCostaRica])
 
