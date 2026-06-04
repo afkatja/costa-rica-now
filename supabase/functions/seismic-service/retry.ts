@@ -34,7 +34,11 @@ export class RetryError extends Error {
 /**
  * Default retry condition - retry on network errors and 5xx status codes
  */
-function defaultShouldRetry(error: Error, attempt: number, maxAttempts?: number): boolean {
+function defaultShouldRetry(
+  error: Error,
+  attempt: number,
+  maxAttempts?: number,
+): boolean {
   // Don't retry if we've exceeded max attempts (use provided override or default)
   const effectiveMaxAttempts = maxAttempts ?? RETRY_CONFIG.MAX_ATTEMPTS
   if (attempt >= effectiveMaxAttempts) {
@@ -97,7 +101,10 @@ function sleep(ms: number): Promise<void> {
 /**
  * Create an AbortController with timeout
  */
-function createTimeoutController(timeoutMs: number): { controller: AbortController; timeoutId: ReturnType<typeof setTimeout> } {
+function createTimeoutController(timeoutMs: number): {
+  controller: AbortController
+  timeoutId: ReturnType<typeof setTimeout>
+} {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
   return { controller, timeoutId }
@@ -182,7 +189,10 @@ export async function fetchWithRetry(
         )
 
         // Check if we should retry
-        if (!shouldRetry(lastError, attempt, maxAttempts) || attempt === maxAttempts) {
+        if (
+          !shouldRetry(lastError, attempt, maxAttempts) ||
+          attempt === maxAttempts
+        ) {
           break
         }
 
@@ -198,9 +208,10 @@ export async function fetchWithRetry(
         )
         await sleep(delay)
       }
-  } catch (error) {
-    console.error(`[retry] Unexpected error for ${url}:`, error)
-    throw error
+    } catch (error) {
+      console.error(`[retry] Unexpected error for ${url}:`, error)
+      throw error
+    }
   }
 
   // All attempts failed
@@ -216,8 +227,7 @@ export async function fetchWithRetry(
     lastError: lastError.message,
     allErrors: errors.map(e => e.message),
   })
-
-  throw retryError
+  return Response.json({ error: retryError.message }, { status: 500 })
 }
 
 /**
