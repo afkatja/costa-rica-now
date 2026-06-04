@@ -97,7 +97,7 @@ function sleep(ms: number): Promise<void> {
 /**
  * Create an AbortController with timeout
  */
-function createTimeoutController(timeoutMs: number): { controller: AbortController; timeoutId: NodeJS.Timeout } {
+function createTimeoutController(timeoutMs: number): { controller: AbortController; timeoutId: ReturnType<typeof setTimeout> } {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
   return { controller, timeoutId }
@@ -144,70 +144,60 @@ export async function fetchWithRetry(
           signal: controller.signal,
         })
 
-      // Check if response is successful
-      if (!response.ok) {
-        const error = new Error(
-          `HTTP error: ${response.status} ${response.statusText}`,
-        )
-        ;(error as any).status = response.status
-        ;(error as any).response = response
+        // Check if response is successful
+        if (!response.ok) {
+          const error = new Error(
+            `HTTP error: ${response.status} ${response.statusText}`,
+          )
+          ;(error as any).status = response.status
+          ;(error as any).response = response
 
-        // Don't retry on client errors (4xx) except 429 and 408
-        if (
-          response.status >= 400 &&
-          response.status < 500 &&
-          response.status !== 429 &&
-          response.status !== 408
-        ) {
+          // Don't retry on client errors (4xx) except 429 and 408
+          if (
+            response.status >= 400 &&
+            response.status < 500 &&
+            response.status !== 429 &&
+            response.status !== 408
+          ) {
+            throw error
+          }
+
           throw error
         }
 
-        throw error
+        console.log(
+          `[retry] Success on attempt ${attempt}/${maxAttempts} for ${url}`,
+        )
+        return response
+      } catch (error) {
+        // Clear timeout on error
+        clearTimeout(timeoutId)
+
+        lastError = error instanceof Error ? error : new Error(String(error))
+        errors.push(lastError)
+
+        console.error(
+          `[retry] Attempt ${attempt} failed for ${url}:`,
+          lastError.message,
+        )
+
+        // Check if we should retry
+        if (!shouldRetry(lastError, attempt, maxAttempts) || attempt === maxAttempts) {
+          break
+        }
+
+        // Calculate delay and wait
+        const delay = calculateDelay(
+          attempt,
+          baseDelayMs,
+          maxDelayMs,
+          backoffFactor,
+        )
+        console.log(
+          `[retry] Waiting ${Math.round(delay)}ms before retry ${attempt + 1}`,
+        )
+        await sleep(delay)
       }
-
-      console.log(
-        `[retry] Success on attempt ${attempt}/${maxAttempts} for ${url}`,
-      )
-      return response
-    } catch (error) {
-      // Clear timeout on error
-      clearTimeout(timeoutId)
-      
-      lastError = error instanceof Error ? error : new Error(String(error))
-      errors.push(lastError)
-
-      console.error(
-        `[retry] Attempt ${attempt} failed for ${url}:`,
-        lastError.message,
-      )
-
-      // Check if we should retry
-      if (!shouldRetry(lastError, attempt, maxAttempts) || attempt === maxAttempts) {
-        break
-      }
-      // Clear timeout on error
-      clearTimeout(timeoutId)
-      
-      lastError = error instanceof Error ? error : new Error(String(error))
-      errors.push(lastError)
-
-      console.error(
-        `[retry] Attempt ${attempt} failed for ${url}:`,
-        lastError.message,
-      )
-
-      // Calculate delay and wait
-      const delay = calculateDelay(
-        attempt,
-        baseDelayMs,
-        maxDelayMs,
-        backoffFactor,
-      )
-      console.log(
-        `[retry] Waiting ${Math.round(delay)}ms before retry ${attempt + 1}`,
-      )
-      await sleep(delay)
-    }
   } catch (error) {
     console.error(`[retry] Unexpected error for ${url}:`, error)
     throw error
