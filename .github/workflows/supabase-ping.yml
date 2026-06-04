@@ -1,0 +1,33 @@
+name: Ping Supabase
+
+on:
+  schedule:
+    # Run every 5 days at midnight UTC (days 5, 10, 15, 20, 25, 30)
+    - cron: '0 0 */5 * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  ping-supabase:
+    name: Ping Supabase Project
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping Supabase
+        run: |
+          # Ping the Supabase project to keep it awake
+          # Uses the SUPABASE_URL secret which should be set in GitHub repository settings
+          if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
+            echo "Error: SUPABASE_URL secret is not set"
+            echo "Please add SUPABASE_URL to your repository secrets"
+            exit 1
+          fi
+          
+          echo "Pinging Supabase at ${{ secrets.SUPABASE_URL }}"
+          curl -f -s -o /dev/null -w "HTTP Status: %{http_code}\n" "${{ secrets.SUPABASE_URL }}"
+          
+          if [ $? -eq 0 ]; then
+            echo "Successfully pinged Supabase"
+          else
+            echo "Failed to ping Supabase"
+            exit 1
+          fi
