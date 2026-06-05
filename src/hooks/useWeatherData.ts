@@ -6,7 +6,8 @@ const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 const ERROR_RETRY_DELAY = 30 * 1000 // 30 seconds
 
 export function useWeatherPage() {
-  const { weatherData, refreshWeather, loading, errors } = useWeatherData()
+  const { weatherData, forecastData, refreshWeather, loading, errors } =
+    useWeatherData()
 
   useEffect(() => {
     if (weatherData.length === 0) {
@@ -22,6 +23,7 @@ export function useWeatherPage() {
 
   return {
     weatherData,
+    forecastData,
     refreshWeather,
     retryRefreshWeather,
     loading: loading.weather,
