@@ -63,6 +63,29 @@ export interface WeatherData {
   }
 }
 
+export interface ForecastData {
+  location: string
+  name: string
+  type: string
+  forecast: Array<{
+    date: string
+    day: string
+    high: number
+    low: number
+    avg_temp: number
+    avg_feels_like: number
+    avg_humidity: number
+    avg_wind_speed: number
+    total_rain: number
+    description: string
+    main: string
+    icon: string
+  }>
+  city: string
+  country: string
+  cached_at: string
+}
+
 interface RadarData {
   location: string
   name: string
@@ -98,6 +121,7 @@ export interface TideData {
 
 interface WeatherDataContextType {
   weatherData: WeatherData[]
+  forecastData: ForecastData[]
   radarData: RadarData[]
   tidesData: TideData[]
   loading: {
@@ -134,6 +158,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
   children,
 }) => {
   const [weatherData, setWeatherData] = useState<WeatherData[]>([])
+  const [forecastData, setForecastData] = useState<ForecastData[]>([])
   const [radarData, setRadarData] = useState<RadarData[]>([])
   const [tidesData, setTidesData] = useState<TideData[]>([])
 
@@ -183,7 +208,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
         {
           body: {
             locations: allLocationKeys,
-            types: ["current"],
+            types: ["current", "forecast"],
           },
         },
       )
@@ -199,7 +224,11 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
         const currentWeather = result.weather.filter(
           (w: any) => w.type === "current",
         )
+        const forecastWeather = result.weather.filter(
+          (w: any) => w.type === "forecast",
+        )
         setWeatherData(currentWeather)
+        setForecastData(forecastWeather)
       }
     } catch (err) {
       console.error("Error fetching weather data:", err)
@@ -316,6 +345,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
 
   const value: WeatherDataContextType = {
     weatherData,
+    forecastData,
     radarData,
     tidesData,
     loading,
