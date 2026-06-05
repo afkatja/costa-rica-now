@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { MapPin, Palmtree } from "lucide-react"
+import { Palmtree } from "lucide-react"
 import { useAuth } from "@/providers/auth-provider"
 import LoadingSpinner from "@/components/Loader"
 import OneTapComponent from "@/components/OneTapSignin"

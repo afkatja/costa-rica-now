@@ -20,7 +20,6 @@ import { WeatherAlert, WeatherDisplay } from "./WeatherDisplay"
 import { EventsAlert, EventsDisplay } from "./EventsDisplay"
 import LoadingSpinner from "./Loader"
 import { useAuth } from "../providers/auth-provider"
-import { createNavigation } from "next-intl/navigation"
 import AuthDialog from "./AuthDialog"
 import { useGeolocation } from "../hooks/use-geolocation"
 
@@ -83,8 +82,6 @@ export function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user } = useAuth()
   const { toast } = useToast()
-  const { useRouter } = createNavigation()
-  const router = useRouter()
 
   // Geolocation hook
   const {
@@ -184,7 +181,7 @@ export function ChatInterface() {
             userPreferences: {}, // TODO: Get from user profile
             locationContext, // Include location data for filtering
           },
-        }
+        },
       )
 
       if (error) throw error
@@ -401,7 +398,7 @@ export function ChatInterface() {
               <Button
                 onClick={() =>
                   setInput(
-                    "What are the best destinations to visit in Costa Rica?"
+                    "What are the best destinations to visit in Costa Rica?",
                   )
                 }
                 className="p-3 text-left bg-gray-50 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
@@ -450,7 +447,7 @@ export function ChatInterface() {
                 "flex gap-3",
                 message.role === "user"
                   ? "ml-auto flex-row-reverse max-w-4xl"
-                  : "mr-auto prose lg:prose-xl"
+                  : "mr-auto prose lg:prose-xl",
               )}
             >
               <div
@@ -458,7 +455,7 @@ export function ChatInterface() {
                   "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
                   message.role === "user"
                     ? "bg-gradient-to-br from-blue-500 to-blue-600"
-                    : "bg-gradient-to-br from-emerald-500 to-teal-600"
+                    : "bg-gradient-to-br from-emerald-500 to-teal-600",
                 )}
               >
                 {message.role === "user" ? (
@@ -472,7 +469,7 @@ export function ChatInterface() {
                   "flex-1 px-4 py-3 rounded-lg",
                   message.role === "user"
                     ? "bg-blue-500 text-gray-50 max-w-3xl"
-                    : "bg-gray-50 border border-gray-200 text-gray-900 max-w-none"
+                    : "bg-gray-50 border border-gray-200 text-gray-900 max-w-none",
                 )}
               >
                 <div className="prose prose-sm max-w-none">
@@ -483,7 +480,7 @@ export function ChatInterface() {
                         "mb-2 last:mb-0",
                         message.role === "user"
                           ? "text-gray-50"
-                          : "text-gray-900"
+                          : "text-gray-900",
                       )}
                     >
                       {line}
@@ -521,7 +518,7 @@ export function ChatInterface() {
                           >
                             {source.title}
                           </span>
-                        )
+                        ),
                       )}
                     </div>
                   </div>

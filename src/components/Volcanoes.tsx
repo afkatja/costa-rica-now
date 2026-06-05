@@ -1,13 +1,7 @@
 import React from "react"
 import { useTranslations } from "next-intl"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
-import {
-  Activity,
-  AlertTriangle,
-  Mountain,
-  Thermometer,
-  Loader2,
-} from "lucide-react"
+import { AlertTriangle, Mountain, Thermometer } from "lucide-react"
 import { ERUPTION_TIME_CODES, Volcano, VolcanoStatus } from "../types/volcano"
 
 const Volcanoes = ({ volcanoes }: { volcanoes: Volcano[] }) => {

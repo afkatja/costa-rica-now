@@ -4,7 +4,7 @@ import { dayInMs, hourInMs } from "../../../../lib/utils"
 
 const TRANSPARENT_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-  "base64"
+  "base64",
 )
 
 const CACHE_DURATION = 10 * 60 * 1000 // 10 minutes (weather doesn't change that fast)
@@ -30,7 +30,7 @@ function initializeKV() {
   } catch (error) {
     console.warn(
       "Failed to initialize KV client, using in-memory fallback:",
-      error
+      error,
     )
     useExternalStore = false
   }
@@ -55,14 +55,14 @@ const pruneRateLimiter = (now: number) => {
   const hourAgo = now - hourInMs
   const dayAgo = now - dayInMs
   rateLimiter.hourlyRequests = rateLimiter.hourlyRequests.filter(
-    t => t >= hourAgo
+    t => t >= hourAgo,
   )
   rateLimiter.dailyRequests = rateLimiter.dailyRequests.filter(t => t >= dayAgo)
 }
 
 // External store functions
 async function getCachedTile(
-  cacheKey: string
+  cacheKey: string,
 ): Promise<{ data: Buffer; timestamp: number } | null> {
   if (!useExternalStore) {
     return tileCache.get(cacheKey) || null
@@ -83,7 +83,7 @@ async function getCachedTile(
 async function setCachedTile(
   cacheKey: string,
   data: Buffer,
-  timestamp: number
+  timestamp: number,
 ) {
   if (!useExternalStore) {
     tileCache.set(cacheKey, { data, timestamp })
@@ -113,10 +113,10 @@ async function getRateLimitCounters(): Promise<{
     const hourAgo = now - hourInMs
     const dayAgo = now - dayInMs
     rateLimiter.hourlyRequests = rateLimiter.hourlyRequests.filter(
-      t => t >= hourAgo
+      t => t >= hourAgo,
     )
     rateLimiter.dailyRequests = rateLimiter.dailyRequests.filter(
-      t => t >= dayAgo
+      t => t >= dayAgo,
     )
     return {
       hourlyRequests: rateLimiter.hourlyRequests.length,
@@ -211,7 +211,7 @@ async function canMakeRequest(): Promise<boolean> {
 
   // Allow burst of 3 requests, then stagger subsequent requests
   const currentSecondRequests = rateLimiter.requests.filter(
-    t => now - t < 1000
+    t => now - t < 1000,
   ).length
 
   // If we haven't hit the 3-request burst limit, allow immediate request
@@ -233,15 +233,6 @@ async function canMakeRequest(): Promise<boolean> {
   return true
 }
 
-function recordRequest() {
-  const now = Date.now()
-  pruneRateLimiter(now)
-  rateLimiter.requests.push(now)
-  rateLimiter.hourlyRequests.push(now)
-  rateLimiter.dailyRequests.push(now)
-  rateLimiter.lastRequestTime = now
-}
-
 // Process queued requests with staggered timing and proper rate limit compliance
 async function processRequestQueue() {
   if (isProcessingQueue || requestQueue.length === 0) return
@@ -259,7 +250,7 @@ async function processRequestQueue() {
     pruneRateLimiter(now)
 
     const currentSecondRequests = rateLimiter.requests.filter(
-      t => now - t < 1000
+      t => now - t < 1000,
     ).length
 
     // Get external counters for hourly/daily limits
@@ -268,7 +259,7 @@ async function processRequestQueue() {
     // If we've hit hourly/daily limits, return cached or transparent tile immediately
     if (counters.hourlyRequests >= 25 || counters.dailyRequests >= 500) {
       console.warn(
-        `Rate limit breached (${counters.hourlyRequests}/25 hourly, ${counters.dailyRequests}/500 daily) - returning fallback`
+        `Rate limit breached (${counters.hourlyRequests}/25 hourly, ${counters.dailyRequests}/500 daily) - returning fallback`,
       )
 
       // Try to find cached tile first
@@ -340,7 +331,7 @@ async function fetchTile(requestData: {
   const apiKey = process.env.TOMORROW_API_KEY
   if (!apiKey) {
     console.warn(
-      "TOMORROW_API_KEY is not configured - returning transparent tile"
+      "TOMORROW_API_KEY is not configured - returning transparent tile",
     )
     return new Response(TRANSPARENT_PNG, {
       headers: { "Content-Type": "image/png", "X-Radar-Disabled": "true" },
@@ -427,7 +418,7 @@ export async function GET(request: NextRequest) {
         }),
         {
           headers: { "Content-Type": "application/json" },
-        }
+        },
       )
     }
 
@@ -445,7 +436,7 @@ export async function GET(request: NextRequest) {
     // If we've hit hourly or daily limits, return cached or transparent tile immediately
     if (status.perHour >= 25 || status.perDay >= 500) {
       console.warn(
-        `Rate limit reached (${status.perHour}/25 hourly, ${status.perDay}/500 daily) - returning fallback`
+        `Rate limit reached (${status.perHour}/25 hourly, ${status.perDay}/500 daily) - returning fallback`,
       )
 
       // Try to find cached tile first
@@ -485,7 +476,7 @@ export async function GET(request: NextRequest) {
     // If we're close to hourly limit, warn and still queue
     if (status.perHour >= 23) {
       console.warn(
-        `Approaching hourly limit (${status.perHour}/25) - queuing request`
+        `Approaching hourly limit (${status.perHour}/25) - queuing request`,
       )
     }
 
@@ -497,7 +488,7 @@ export async function GET(request: NextRequest) {
         resolve(
           new Response(TRANSPARENT_PNG, {
             headers: { "Content-Type": "image/png", "X-Timeout": "true" },
-          })
+          }),
         )
       }, 30000) // 30s timeout
       requestQueue.push({

@@ -176,5 +176,10 @@
       "Q": "Quaternary (within last 2.6 million years)",
       "U": "Unknown"
     }
+  },
+  "mapError": {
+    "title": "Map Error",
+    "message": "Unable to load the map. Please try refreshing the page.",
+    "refreshButton": "Refresh Page"
   }
 }

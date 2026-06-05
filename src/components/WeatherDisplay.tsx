@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React from "react"
 import {
   Cloud,
   Sun,
@@ -10,7 +10,6 @@ import {
   Wind,
   Eye,
   Droplets,
-  Thermometer,
   MapPin,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -41,7 +40,7 @@ interface WeatherDisplayProps {
   className?: string
 }
 
-const getWeatherIcon = (condition: string, iconCode?: string) => {
+const getWeatherIcon = (condition: string) => {
   const iconProps = { size: 20, className: "text-gray-50" }
 
   switch (condition.toLowerCase()) {
@@ -111,15 +110,16 @@ export function WeatherDisplay({
               key={w.location}
               className={cn(
                 "flex items-center gap-2 px-3 py-2 rounded-lg text-gray-50 text-sm",
-                `bg-gradient-to-r ${getBackgroundGradient(w.current.main)}`
+                `bg-linear-to-r ${getBackgroundGradient(w.current.main)}`,
               )}
             >
-              {getWeatherIcon(w.current.main, w.current.icon)}
+              {getWeatherIcon(w.current.main)}
               <span className="font-medium">{w.name}</span>
               <span
-                className={`${getTemperatureColor(
-                  w.current.temperature
-                )} font-bold`}
+                className={cn(
+                  getTemperatureColor(w.current.temperature),
+                  "font-bold",
+                )}
               >
                 {w.current.temperature}°C
               </span>
@@ -144,7 +144,7 @@ export function WeatherDisplay({
             key={w.location}
             className={cn(
               "relative overflow-hidden rounded-xl p-4 text-gray-50",
-              `bg-gradient-to-br ${getBackgroundGradient(current.main)}`
+              `bg-gradient-to-br ${getBackgroundGradient(current.main)}`,
             )}
           >
             {/* Header */}
@@ -153,7 +153,7 @@ export function WeatherDisplay({
                 <MapPin size={16} className="opacity-80" />
                 <h3 className="font-semibold">{w.name}</h3>
               </div>
-              {getWeatherIcon(current.main, current.icon)}
+              {getWeatherIcon(current.main)}
             </div>
 
             {/* Main Temperature */}
@@ -230,17 +230,17 @@ export function WeatherAlert({ weather }: { weather: WeatherData[] }) {
               const messages = []
               if (w.current?.main === "Thunderstorm") {
                 messages.push(
-                  `⚡ Thunderstorm alert in ${w.name} - consider indoor activities`
+                  `⚡ Thunderstorm alert in ${w.name} - consider indoor activities`,
                 )
               }
               if (w.current && w.current.temperature >= 35) {
                 messages.push(
-                  `🌡️ High temperature in ${w.name} (${w.current.temperature}°C) - stay hydrated`
+                  `🌡️ High temperature in ${w.name} (${w.current.temperature}°C) - stay hydrated`,
                 )
               }
               if (w.current && w.current.wind_speed > 10) {
                 messages.push(
-                  `💨 Strong winds in ${w.name} (${w.current.wind_speed} m/s)`
+                  `💨 Strong winds in ${w.name} (${w.current.wind_speed} m/s)`,
                 )
               }
               return messages.map((msg, i) => (

@@ -1,9 +1,40 @@
 import { COSTA_RICA_BOUNDS } from "../_shared/coords.ts"
 import { corsHeaders } from "../_shared/cors.ts"
-// import { load } from "https://esm.sh/cheerio@1.0.0-rc.12"
+import { withEdgeHandler } from "../_shared/edge-handler.ts"
+
+// Import new modules
+import {
+  DEDUPLICATION_THRESHOLDS,
+  TIMEOUT_CONFIG,
+  MAGNITUDE_FILTERS,
+  SOURCE_PRIORITY,
+  API_ENDPOINTS,
+  REQUEST_HEADERS,
+  DATE_RANGE_CONFIG,
+  PAGINATION_DEFAULTS,
+} from "./config.ts"
+import { parseOvsicoriTableRows, parseRSNXML } from "./xml-parser.ts"
+import { fetchWithRetry } from "./retry.ts"
+import { SeismicEvent, FetchParams } from "./types.ts"
 
 // Add Deno type for Edge Functions
 declare const Deno: any
+
+// Helper function to validate date strings
+function validateDateString(dateString: string): {
+  valid: boolean
+  date?: Date
+} {
+  if (!dateString || typeof dateString !== "string") {
+    return { valid: false }
+  }
+
+  const date = new Date(dateString)
+  return {
+    valid: !isNaN(date.getTime()),
+    date: !isNaN(date.getTime()) ? date : undefined,
+  }
+}
 
 // Helper function to format datetime for Costa Rica locale
 function formatDateTime(timestamp: number): string {
@@ -33,61 +64,49 @@ function addFormattedFields(event: SeismicEvent): SeismicEvent {
   }
 }
 
-const normalizeOvsicori = (quake: any): SeismicEvent => ({
-  id: `ovsicori-${quake["Fecha y Hora Local"].replace(
-    /\D/g,
-    "",
-  )}-${quake.lat.toFixed(3)}-${quake.lon.toFixed(3)}`,
-  source: "ovsicori" as const,
-  magnitude: parseFloat(quake.Magnitud),
-  location: quake.Ubicacion,
-  lat: quake.lat,
-  lon: quake.lon,
-  depth: quake["Prof. km"] ? parseFloat(quake["Prof. km"]) : null,
-  time: new Date(`${quake["Fecha y Hora Local"]} UTC-6`).getTime(), // Costa Rica local time → timestamp
-  // felt: null, // OVSICORI doesn't provide direct "felt" count
-  // intensity: null, // no direct intensity
-  tsunami: false, // not available
-  status: quake.Autor || "unknown",
-  url: quake.url,
-})
+// OVSICORI table parsing is now in xml-parser module
 
-// Unified event structure
-interface SeismicEvent {
-  id: string
-  source: "rsn" | "usgs" | "ovsicori" | "manual"
-  magnitude: number
-  location: string
-  lat: number
-  lon: number
-  depth: number | null
-  time: number // Unix timestamp in milliseconds
-  felt?: number
-  intensity?: number
-  tsunami: boolean
-  url?: string
-  status?: string
-  // Formatted date/time fields for client convenience
-  formattedTime?: string
-  formattedDateTime?: string
+// Unified event structure is now in types.ts
+
+function getSourceCounts(events: SeismicEvent[]) {
+  return {
+    total: events.length,
+    usgs: events.filter(event => event.source === "usgs").length,
+    ovsicori: events.filter(event => event.source === "ovsicori").length,
+    rsn: events.filter(event => event.source === "rsn").length,
+    manual: events.filter(event => event.source === "manual").length,
+  }
 }
 
-interface FetchParams {
-  startDate: string // ISO format: YYYY-MM-DD
-  endDate: string
-  minMagnitude?: number
-  maxMagnitude?: number
-  source?: "usgs" | "ovsicori" | "rsn" | "manual"
-  lat?: number
-  lon?: number
-  radiusKm?: number
-  limit?: number
-  offset?: number
+function getFetchSummary(
+  result: PromiseSettledResult<SeismicEvent[]>,
+):
+  | { status: "fulfilled"; count: number }
+  | { status: "rejected"; reason: string } {
+  if (result.status === "fulfilled") {
+    return {
+      status: result.status,
+      count: result.value.length,
+    }
+  }
+
+  return {
+    status: result.status,
+    reason:
+      result.reason instanceof Error
+        ? result.reason.message
+        : String(result.reason),
+  }
 }
 
-// Fetch USGS data
+// Fetch USGS data with retry logic
 async function fetchUSGSData(params: FetchParams): Promise<SeismicEvent[]> {
-  const { startDate, endDate, minMagnitude = 2.5, maxMagnitude } = params
+  const {
+    startDate,
+    endDate,
+    minMagnitude = MAGNITUDE_FILTERS.USGS_MIN,
+    maxMagnitude,
+  } = params
 
   const queryParams = new URLSearchParams({
     format: "geojson",
@@ -104,115 +123,109 @@ async function fetchUSGSData(params: FetchParams): Promise<SeismicEvent[]> {
     queryParams.append("maxmagnitude", maxMagnitude.toString())
   }
 
-  const url = `https://earthquake.usgs.gov/fdsnws/event/1/query?${queryParams.toString()}`
-
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "Supabase-Edge-Function/1.0",
-    },
-  })
-
-  if (!response.ok) {
-    throw new Error(`USGS API error: ${response.status} ${response.statusText}`)
-  }
-
-  const data = await response.json()
-
-  // Transform to unified format and add formatted fields
-  return data.features.map((feature: any) =>
-    addFormattedFields({
-      id: `usgs-${feature.id}`,
-      source: "usgs" as const,
-      magnitude: feature.properties.mag,
-      location: feature.properties.place,
-      lat: feature.geometry.coordinates[1],
-      lon: feature.geometry.coordinates[0],
-      depth: feature.geometry.coordinates[2],
-      time: feature.properties.time,
-      felt: feature.properties.felt,
-      intensity: feature.properties.cdi,
-      tsunami: feature.properties.tsunami === 1,
-      url: feature.properties.url,
-      status: feature.properties.status,
-    }),
-  )
-}
-
-// Fetch OVSICORI data
-async function fetchOVSICORIData(params: FetchParams): Promise<SeismicEvent[]> {
-  const { startDate } = params
-
-  // Parse year and month from startDate
-  const date = new Date(startDate)
-  const year = date.getFullYear()
-  const month = date.getMonth() + 1 // JavaScript months are 0-indexed
-
-  const url = `https://www.ovsicori.una.ac.cr/sistemas/ssentido/Automapames_fix.php?anno=${year}&mes=${month}`
+  const url = `${API_ENDPOINTS.USGS}?${queryParams.toString()}`
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Supabase-Edge-Function/1.0",
-      },
+    const response = await fetchWithRetry({
+      url,
+      headers: REQUEST_HEADERS.DEFAULT,
+      timeoutMs: TIMEOUT_CONFIG.USGS_TIMEOUT_MS,
     })
 
-    if (!response.ok) {
-      console.warn(`OVSICORI fetch warning: ${response.status}`)
-      return []
-    }
+    const data = await response.json()
+
+    // Transform to unified format and add formatted fields
+    return data.features.map((feature: any) =>
+      addFormattedFields({
+        id: `usgs-${feature.id}`,
+        source: "usgs" as const,
+        magnitude: feature.properties.mag,
+        location: feature.properties.place,
+        lat: feature.geometry.coordinates[1],
+        lon: feature.geometry.coordinates[0],
+        depth: feature.geometry.coordinates[2],
+        time: feature.properties.time,
+        felt: feature.properties.felt,
+        intensity: feature.properties.cdi,
+        tsunami: feature.properties.tsunami === 1,
+        url: feature.properties.url,
+        status: feature.properties.status,
+      }),
+    )
+  } catch (error) {
+    console.error(`USGS fetch failed:`, error)
+    throw error
+  }
+}
+
+// Fetch OVSICORI data with retry logic
+async function fetchOVSICORIData(params: FetchParams): Promise<SeismicEvent[]> {
+  const { startDate, endDate } = params
+
+  const url = API_ENDPOINTS.OVSICORI
+
+  try {
+    const response = await fetchWithRetry({
+      url,
+      headers: REQUEST_HEADERS.DEFAULT,
+      timeoutMs: TIMEOUT_CONFIG.OVSICORI_TIMEOUT_MS,
+    })
 
     const html = await response.text()
-    const regex =
-      /L\.marker\(\[([\d\.-]+),([\d\.-]+)\][\s\S]*?bindPopup\('([\s\S]*?)',/g
+    const parseResult = parseOvsicoriTableRows(html, url)
 
-    const earthquakes = []
-    let match
-
-    while ((match = regex.exec(html)) !== null) {
-      const [_, lat, lon, popupHtml] = match
-
-      // parse the popupHtml with simple regex for easy extraction
-      const trMatches = popupHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || []
-      const data: Record<string, string> = {}
-
-      trMatches.forEach(trHtml => {
-        const tdMatches = trHtml.match(/<td[^>]*>([^<]*)<\/td>/gi) || []
-        if (tdMatches.length >= 2) {
-          const keyMatch = tdMatches[0]?.match(/<td[^>]*>([^<]*)<\/td>/i)
-          const valueMatch = tdMatches[1].match(/<td[^>]*>([^<]*)<\/td>/i)
-
-          if (keyMatch && valueMatch) {
-            const key = keyMatch[1].trim().replace(/[:\[\]]/g, "")
-            const value = valueMatch[1].trim()
-            data[key] = value
-          }
-        }
-      })
-
-      earthquakes.push({
-        lat: parseFloat(lat),
-        lon: parseFloat(lon),
-        url,
-        ...data,
-      })
+    // Log any parsing issues
+    if (parseResult.errors.length > 0) {
+      console.error(
+        "[seismic-service] OVSICORI parsing errors:",
+        parseResult.errors,
+      )
+    }
+    if (parseResult.warnings.length > 0) {
+      console.warn(
+        "[seismic-service] OVSICORI parsing warnings:",
+        parseResult.warnings,
+      )
     }
 
-    return earthquakes
-      .map(normalizeOvsicori)
-      .map(addFormattedFields)
-      .filter(event => event.magnitude >= 2.5)
+    const events = parseResult.events.filter(
+      (event: SeismicEvent) =>
+        event.magnitude >= MAGNITUDE_FILTERS.OVSICORI_MIN,
+    )
+    const startTime = new Date(`${startDate}T00:00:00-06:00`).getTime()
+    const endTime = new Date(`${endDate}T23:59:59-06:00`).getTime()
+
+    const filteredEvents = events.filter(
+      (event: SeismicEvent) => event.time >= startTime && event.time <= endTime,
+    )
+
+    console.log("[seismic-service] OVSICORI table parse", {
+      parsed: events.length,
+      startDate,
+      endDate,
+      inRange: filteredEvents.length,
+      errors: parseResult.errors.length,
+      warnings: parseResult.warnings.length,
+    })
+
+    return filteredEvents
   } catch (error) {
     console.error("OVSICORI fetch error:", error)
     return []
   }
 }
 
-// Fetch RSN data with comprehensive debugging
+// Fetch RSN data with retry logic and multiple configurations
 async function fetchRSNData(params: FetchParams): Promise<SeismicEvent[]> {
-  const { startDate, endDate, minMagnitude = 2.5, maxMagnitude } = params
+  const {
+    startDate,
+    endDate,
+    minMagnitude = MAGNITUDE_FILTERS.RSN_MIN,
+    maxMagnitude,
+  } = params
 
   console.log(
-    `\n=== Fetching RSN data for requested range: ${startDate} to ${endDate} ===`,
+    `[seismic-service] Fetching RSN data for range: ${startDate} to ${endDate}`,
   )
 
   const queryParams = new URLSearchParams({
@@ -229,285 +242,140 @@ async function fetchRSNData(params: FetchParams): Promise<SeismicEvent[]> {
     queryParams.append("maxmagnitude", maxMagnitude.toString())
   }
 
-  const url = `https://www.isc.ac.uk/fdsnws/event/1/query?${queryParams.toString()}`
+  const url = `${API_ENDPOINTS.RSN}?${queryParams.toString()}`
 
-  try {
-    // Try multiple request configurations
-    const requestConfigs: Array<{
-      name: string
-      headers: Record<string, string>
-      redirect: RequestRedirect
-    }> = [
-      {
-        name: "Browser-like headers",
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          Accept:
-            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.5",
-          "Accept-Encoding": "gzip, deflate, br",
-          Connection: "keep-alive",
-          "Upgrade-Insecure-Requests": "1",
-          "Cache-Control": "no-cache",
-        },
-        redirect: "follow",
-      },
-      {
-        name: "Minimal headers",
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible)",
-        },
-        redirect: "follow",
-      },
-      {
-        name: "Current Edge Function headers",
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; SeismicService/1.0)",
-          Accept: "application/xml, text/xml, */*",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-        redirect: "follow",
-      },
-    ]
+  // Try different request configurations
+  const requestConfigs = [
+    {
+      name: "Browser-like",
+      headers: REQUEST_HEADERS.BROWSER_LIKE,
+    },
+    {
+      name: "Minimal",
+      headers: REQUEST_HEADERS.MINIMAL,
+    },
+    {
+      name: "Seismic Service",
+      headers: REQUEST_HEADERS.SEISMIC_SERVICE,
+    },
+  ]
 
-    for (const config of requestConfigs) {
-      console.log(`\n--- Testing with ${config.name} ---`)
+  for (const config of requestConfigs) {
+    try {
+      console.log(`[seismic-service] Trying RSN with ${config.name} headers`)
 
-      const response = await fetch(url, {
-        method: "GET",
+      const response = await fetchWithRetry({
+        url,
         headers: config.headers,
-        redirect: config.redirect,
+        timeoutMs: TIMEOUT_CONFIG.RSN_TIMEOUT_MS,
       })
 
-      console.log(`Response status: ${response.status} ${response.statusText}`)
-      console.log(`Response URL: ${response.url}`)
-      console.log(`Redirected: ${response.redirected}`)
-      console.log(
-        "Response headers:",
-        Object.fromEntries(response.headers.entries()),
-      )
+      const xmlText = await response.text()
 
-      if (response.status === 200) {
-        const xmlText = await response.text()
-        console.log(`Response length: ${xmlText.length} characters`)
-        console.log("Response preview:", xmlText.substring(0, 500))
+      if (
+        xmlText.length > 0 &&
+        (xmlText.includes("<isc") || xmlText.includes("<?xml"))
+      ) {
+        console.log(`[seismic-service] RSN success with ${config.name} headers`)
+        const parseResult = parseRSNXML(xmlText, startDate, endDate)
 
-        if (
-          xmlText.length > 0 &&
-          (xmlText.includes("<isc") || xmlText.includes("<?xml"))
-        ) {
-          console.log(`✅ SUCCESS: Got XML data with ${config.name}`)
-          return await parseRSNXML(xmlText, startDate, endDate)
-        } else {
-          console.log(`⚠️  Response is not XML or is empty`)
+        // Log any parsing issues
+        if (parseResult.errors.length > 0) {
+          console.error(
+            "[seismic-service] RSN parsing errors:",
+            parseResult.errors,
+          )
         }
-      } else if (response.status === 204) {
-        console.log(`⚠️  204 No Content with ${config.name}`)
-      } else {
-        console.log(`❌ Error ${response.status} with ${config.name}`)
-      }
+        if (parseResult.warnings.length > 0) {
+          console.warn(
+            "[seismic-service] RSN parsing warnings:",
+            parseResult.warnings,
+          )
+        }
 
-      // Small delay between requests
-      await new Promise(resolve => setTimeout(resolve, 100))
+        console.log(
+          `[seismic-service] RSN parsed ${parseResult.events.length} events`,
+        )
+        return parseResult.events
+      } else {
+        console.warn(
+          `[seismic-service] RSN response not XML with ${config.name}`,
+        )
+      }
+    } catch (error) {
+      console.warn(`[seismic-service] RSN failed with ${config.name}:`, error)
+      continue
     }
-  } catch (error) {
-    console.error(
-      `Error fetching RSN data for range ${startDate} to ${endDate}:`,
-      error,
-    )
   }
 
-  console.log("❌ All RSN requests failed - returning empty array")
+  console.log(
+    "[seismic-service] All RSN configurations failed - returning empty array",
+  )
   return []
 }
 
-// Helper function to parse RSN XML
-async function parseRSNXML(
-  xmlText: string,
-  startDate: string,
-  endDate: string,
-): Promise<SeismicEvent[]> {
-  console.log("Parsing RSN XML data...")
+// RSN XML parsing is now in xml-parser module
 
-  // Simple regex-based XML parser for ISC format
-  const eventMatches = xmlText.match(/<event[^>]*>([\s\S]*?)<\/event>/gi) || []
-  console.log(`Found ${eventMatches.length} events`)
-
-  const events = eventMatches.map((eventXml, index) => {
-    // Extract event ID
-    const idMatch = eventXml.match(/publicid="([^"]*)"/i)
-    const id = idMatch ? idMatch[1] : `isc-${Date.now()}-${index}`
-
-    // Extract preferred origin data
-    const preferredOriginMatch = eventXml.match(
-      /<origin[^>]*preferred="true"[^>]*>([\s\S]*?)<\/origin>/i,
-    )
-    const originMatch =
-      preferredOriginMatch ||
-      eventXml.match(/<origin[^>]*>([\s\S]*?)<\/origin>/i)
-
-    let timeStr = ""
-    let lat = 0
-    let lon = 0
-    let depth = null
-
-    if (originMatch) {
-      const originXml = originMatch[1]
-
-      // Extract time
-      const timeMatch = originXml.match(
-        /<time[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i,
-      )
-      timeStr = timeMatch ? timeMatch[1].trim() : ""
-
-      // Extract latitude
-      const latMatch = originXml.match(
-        /<latitude[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i,
-      )
-      lat = latMatch ? parseFloat(latMatch[1].trim()) : 0
-
-      // Extract longitude
-      const lonMatch = originXml.match(
-        /<longitude[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i,
-      )
-      lon = lonMatch ? parseFloat(lonMatch[1].trim()) : 0
-
-      // Extract depth
-      const depthMatch = originXml.match(
-        /<depth[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i,
-      )
-      depth = depthMatch ? parseFloat(depthMatch[1].trim()) : null
-    }
-
-    const time = timeStr ? new Date(timeStr).getTime() : Date.now()
-
-    // Extract preferred magnitude
-    const preferredMagMatch = eventXml.match(
-      /<magnitude[^>]*preferred="true"[^>]*>([\s\S]*?)<\/magnitude>/i,
-    )
-    const magMatch =
-      preferredMagMatch ||
-      eventXml.match(/<magnitude[^>]*>([\s\S]*?)<\/magnitude>/i)
-
-    let magnitude = 0
-    if (magMatch) {
-      const magValueMatch = magMatch[1].match(
-        /<mag[^>]*>[\s]*<value[^>]*>([^<]*)<\/value>/i,
-      )
-      magnitude = magValueMatch ? parseFloat(magValueMatch[1].trim()) : 0
-    }
-
-    // Extract location description
-    const descMatch = eventXml.match(
-      /<description[^>]*>[\s]*<text[^>]*>([^<]*)<\/text>/i,
-    )
-    const location = descMatch
-      ? descMatch[1].trim()
-      : `Lat: ${lat.toFixed(2)}, Lon: ${lon.toFixed(2)}`
-
-    // Extract network information from creationInfo (author and agencyID)
-    const networks = new Set()
-
-    // Extract authors and agencyIDs from origin and magnitude creationInfo
-    const creationInfoMatches =
-      eventXml.match(/<creationInfo[^>]*>([\s\S]*?)<\/creationInfo>/gi) || []
-    creationInfoMatches.forEach(creationInfo => {
-      const authorMatch = creationInfo.match(/<author[^>]*>([^<]*)<\/author>/i)
-      const agencyMatch = creationInfo.match(
-        /<agencyID[^>]*>([^<]*)<\/agencyID>/i,
-      )
-
-      if (authorMatch) networks.add(authorMatch[1].toLowerCase().trim())
-      if (agencyMatch) networks.add(agencyMatch[1].toLowerCase().trim())
-    })
-
-    const networkStr = Array.from(networks).join(",")
-    const isRsnRelated =
-      networkStr.includes("rsn") ||
-      networkStr.includes("ucr") ||
-      networkStr.includes("tc") ||
-      location.toLowerCase().includes("costa rica")
-
-    return {
-      id: `rsn-${id}`,
-      source: "rsn" as const,
-      magnitude,
-      location,
-      lat,
-      lon,
-      depth,
-      time,
-      felt: undefined,
-      intensity: undefined,
-      tsunami: false,
-      url: `http://www.isc.ac.uk/iscbulletin/search/event/${id}`,
-      status: "reviewed",
-      isRsnRelated,
-    }
-  })
-
-  console.log(`Parsed ${events.length} events, filtering for RSN-related...`)
-
-  // Filter for RSN/UCR/TC related events and transform to unified format
-  return events
-    .filter((event: any) => event.isRsnRelated)
-    .map((event: any) => {
-      const { isRsnRelated, ...eventData } = event
-      return addFormattedFields(eventData)
-    })
-}
-
-// Deduplicate events based on proximity, time, and magnitude
+// Deduplicate events based on proximity, time, and magnitude using configuration constants
 function deduplicateEvents(events: SeismicEvent[]): SeismicEvent[] {
   const deduplicated: SeismicEvent[] = []
 
   for (const event of events) {
     const isDuplicate = deduplicated.some(existing => {
-      // Consider it a duplicate if:
-      // - Within 5 minutes
-      // - Within ~50km (0.5 degrees)
-      // - Magnitude difference < 0.3
+      if (event.source === existing.source) {
+        return false
+      }
+
+      // Use configuration constants for deduplication thresholds
       const timeDiff = Math.abs(event.time - existing.time)
-      const latDiff = Math.abs(event.lat - existing.lat)
-      const lonDiff = Math.abs(event.lon - existing.lon)
+      const distanceKm = calculateDistance(
+        event.lat,
+        event.lon,
+        existing.lat,
+        existing.lon,
+      )
       const magDiff = Math.abs(event.magnitude - existing.magnitude)
 
       return (
-        timeDiff < 300000 && // 5 minutes in milliseconds
-        latDiff < 0.5 &&
-        lonDiff < 0.5 &&
-        magDiff < 0.3
+        timeDiff < DEDUPLICATION_THRESHOLDS.TIME_MS &&
+        distanceKm < DEDUPLICATION_THRESHOLDS.DISTANCE_KM &&
+        magDiff < DEDUPLICATION_THRESHOLDS.MAGNITUDE_DIFF
       )
     })
 
     if (!isDuplicate) {
       deduplicated.push(event)
     } else {
-      // Prefer OVSICORI over USGS for duplicates (local source is more accurate)
+      // Find the existing duplicate to potentially replace
       const existingIndex = deduplicated.findIndex(existing => {
+        if (event.source === existing.source) {
+          return false
+        }
+
         const timeDiff = Math.abs(event.time - existing.time)
-        const latDiff = Math.abs(event.lat - existing.lat)
-        const lonDiff = Math.abs(event.lon - existing.lon)
+        const distanceKm = calculateDistance(
+          event.lat,
+          event.lon,
+          existing.lat,
+          existing.lon,
+        )
         const magDiff = Math.abs(event.magnitude - existing.magnitude)
 
         return (
-          timeDiff < 300000 && latDiff < 0.5 && lonDiff < 0.5 && magDiff < 0.3
+          timeDiff < DEDUPLICATION_THRESHOLDS.TIME_MS &&
+          distanceKm < DEDUPLICATION_THRESHOLDS.DISTANCE_KM &&
+          magDiff < DEDUPLICATION_THRESHOLDS.MAGNITUDE_DIFF
         )
       })
 
-      // Prefer RSN > OVSICORI > USGS for duplicates
+      // Use source priority configuration for deduplication
       if (existingIndex !== -1) {
         const existing = deduplicated[existingIndex]
-        // RSN takes priority over all
-        if (
-          event.source.toLowerCase() === "rsn" &&
-          existing.source.toLowerCase() !== "rsn"
-        ) {
-          deduplicated[existingIndex] = event
-        }
-        // OVSICORI takes priority over USGS only
-        else if (event.source === "ovsicori" && existing.source === "usgs") {
+        const eventPriority = SOURCE_PRIORITY[event.source] || 0
+        const existingPriority = SOURCE_PRIORITY[existing.source] || 0
+
+        // Replace if current event has higher priority
+        if (eventPriority > existingPriority) {
           deduplicated[existingIndex] = event
         }
       }
@@ -557,217 +425,325 @@ function sortEvents(events: SeismicEvent[]): SeismicEvent[] {
 }
 
 // Main handler
-Deno.serve(async (req: Request) => {
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders })
-  }
+Deno.serve(
+  withEdgeHandler(async (req: Request) => {
+    try {
+      const body = await req.json()
+      const { type, ...params } = body
 
-  try {
-    const body = await req.json()
-    const { type, ...params } = body
+      if (type !== "earthquake") {
+        return new Response(
+          JSON.stringify({
+            error: 'Invalid type. Currently only "earthquake" is supported',
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        )
+      }
 
-    if (type !== "earthquake") {
+      // Adjust date range when filters are present
+      let adjustedParams = { ...params }
+      const hasFilters =
+        params.source ||
+        params.minMagnitude ||
+        params.lat ||
+        params.lon ||
+        params.radiusKm
+
+      if (hasFilters && params.startDate) {
+        const startDateValidation = validateDateString(params.startDate)
+        if (!startDateValidation.valid) {
+          return new Response(
+            JSON.stringify({
+              error: "Invalid startDate parameter",
+              message: "startDate must be a valid date string",
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          )
+        }
+
+        const startDate = startDateValidation.date!
+        // Use configuration for date range extension
+        startDate.setMonth(
+          startDate.getMonth() - DATE_RANGE_CONFIG.FILTER_EXTENSION_MONTHS,
+        )
+        adjustedParams.startDate = startDate.toISOString().split("T")[0] // YYYY-MM-DD format
+      }
+
+      console.log("[seismic-service] request", {
+        type,
+        params,
+        hasFilters: Boolean(hasFilters),
+        fetchParams: hasFilters ? adjustedParams : params,
+      })
+
+      // Fetch from all available sources in parallel
+      const [usgsEvents, ovsicoriEvents, rsnEvents] = await Promise.allSettled([
+        fetchUSGSData(hasFilters ? adjustedParams : params),
+        fetchOVSICORIData(hasFilters ? adjustedParams : params),
+        fetchRSNData(hasFilters ? adjustedParams : params),
+      ])
+
+      console.log("[seismic-service] source fetch results", {
+        usgs: getFetchSummary(usgsEvents),
+        ovsicori: getFetchSummary(ovsicoriEvents),
+        rsn: getFetchSummary(rsnEvents),
+      })
+
+      const allEvents: SeismicEvent[] = []
+
+      // Collect USGS events
+      if (usgsEvents.status === "fulfilled") {
+        allEvents.push(...usgsEvents.value)
+      } else {
+        console.error("USGS fetch failed:", usgsEvents.reason)
+      }
+
+      // Collect OVSICORI events
+      if (ovsicoriEvents.status === "fulfilled") {
+        allEvents.push(...ovsicoriEvents.value)
+      } else {
+        console.error("OVSICORI fetch failed:", ovsicoriEvents.reason)
+      }
+      // Collect RSN events
+      if (rsnEvents.status === "fulfilled") {
+        allEvents.push(...rsnEvents.value)
+      } else {
+        console.error("RSN fetch failed:", rsnEvents.reason)
+      }
+
+      // Filter events by requested date range (if provided) to avoid returning
+      // a full month of OVSICORI data when callers requested a narrower window.
+      const filterEventsByDateRange = (
+        events: SeismicEvent[],
+        start?: string,
+        end?: string,
+      ) => {
+        if (!start && !end) return events
+
+        let startTs: number
+        let endTs: number
+
+        if (start) {
+          const startValidation = validateDateString(start)
+          if (!startValidation.valid) {
+            throw new Error(`Invalid startDate parameter: ${start}`)
+          }
+          // Apply Costa Rica timezone offset (-06:00) for full day coverage
+          const startDate = startValidation.date!
+          startTs =
+            new Date(
+              startDate.getFullYear(),
+              startDate.getMonth(),
+              startDate.getDate(),
+              0,
+              0,
+              0,
+            ).getTime() +
+            Math.abs(DATE_RANGE_CONFIG.COSTA_RICA_TIMEZONE_OFFSET) *
+              60 *
+              60 *
+              1000
+        } else {
+          startTs = new Date().getTime() - 24 * 60 * 60 * 1000
+        }
+
+        if (end) {
+          const endValidation = validateDateString(end)
+          if (!endValidation.valid) {
+            throw new Error(`Invalid endDate parameter: ${end}`)
+          }
+          // Apply Costa Rica timezone offset (-06:00) for full day coverage
+          const endDate = endValidation.date!
+          endTs =
+            new Date(
+              endDate.getFullYear(),
+              endDate.getMonth(),
+              endDate.getDate(),
+              23,
+              59,
+              59,
+              999,
+            ).getTime() +
+            Math.abs(DATE_RANGE_CONFIG.COSTA_RICA_TIMEZONE_OFFSET) *
+              60 *
+              60 *
+              1000
+        } else {
+          endTs = new Date().getTime()
+        }
+
+        return events.filter(e => e.time >= startTs && e.time <= endTs)
+      }
+
+      const filteredEvents = filterEventsByDateRange(
+        allEvents,
+        params.startDate as string,
+        params.endDate as string,
+      )
+
+      console.log("[seismic-service] after date filter", {
+        before: getSourceCounts(allEvents),
+        after: getSourceCounts(filteredEvents),
+        removed: allEvents.length - filteredEvents.length,
+        startDate: params.startDate,
+        endDate: params.endDate,
+      })
+
+      // Filter events by magnitude range
+      const magnitudeFilteredEvents = filteredEvents.filter(event => {
+        const meetsMin =
+          params.minMagnitude !== undefined
+            ? event.magnitude >= params.minMagnitude
+            : true
+        const meetsMax =
+          params.maxMagnitude !== undefined
+            ? event.magnitude <= params.maxMagnitude
+            : true
+        return meetsMin && meetsMax
+      })
+
+      console.log("[seismic-service] after magnitude filter", {
+        before: getSourceCounts(filteredEvents),
+        after: getSourceCounts(magnitudeFilteredEvents),
+        removed: filteredEvents.length - magnitudeFilteredEvents.length,
+        minMagnitude: params.minMagnitude,
+        maxMagnitude: params.maxMagnitude,
+      })
+
+      // Apply location filtering if requested
+      const locationFilteredEvents = filterEventsByLocation(
+        magnitudeFilteredEvents,
+        params.lat,
+        params.lon,
+        params.radiusKm,
+      )
+
+      console.log("[seismic-service] after location filter", {
+        before: getSourceCounts(magnitudeFilteredEvents),
+        after: getSourceCounts(locationFilteredEvents),
+        removed: magnitudeFilteredEvents.length - locationFilteredEvents.length,
+        lat: params.lat,
+        lon: params.lon,
+        radiusKm: params.radiusKm,
+      })
+
+      // If source filter is applied, return all events from that source (no deduplication)
+      // Otherwise, deduplicate events and return the merged result
+      let processedEvents: SeismicEvent[]
+      if (params.source) {
+        processedEvents = locationFilteredEvents.filter(
+          event => event.source === params.source,
+        )
+      } else {
+        // Deduplicate when no specific source is requested
+        processedEvents = deduplicateEvents(locationFilteredEvents)
+      }
+
+      const sortedEvents = sortEvents(processedEvents)
+
+      console.log("[seismic-service] after source/dedup processing", {
+        sourceFilter: params.source,
+        before: getSourceCounts(locationFilteredEvents),
+        after: getSourceCounts(processedEvents),
+        removed: locationFilteredEvents.length - processedEvents.length,
+      })
+
+      // Apply pagination using configuration defaults
+      const limit = params.limit || PAGINATION_DEFAULTS.DEFAULT_LIMIT
+      const offset = params.offset || PAGINATION_DEFAULTS.DEFAULT_OFFSET
+      const paginatedEvents = sortedEvents.slice(offset, offset + limit)
+
+      console.log("[seismic-service] pagination result", {
+        totalBeforePagination: sortedEvents.length,
+        returned: paginatedEvents.length,
+        limit,
+        offset,
+        hasMore: offset + limit < sortedEvents.length,
+        returnedCounts: getSourceCounts(paginatedEvents),
+      })
+
+      // Calculate statistics (on full dataset)
+      const stats = {
+        total: sortedEvents.length,
+        sources: {
+          usgs: sortedEvents.filter(e => e.source === "usgs").length,
+          ovsicori: sortedEvents.filter(e => e.source === "ovsicori").length,
+          rsn: sortedEvents.filter(e => e.source === "rsn").length,
+          manual: sortedEvents.filter(e => e.source === "manual").length,
+        },
+        magnitudeRange:
+          sortedEvents.length > 0
+            ? {
+                min: Math.min(...sortedEvents.map(e => e.magnitude)),
+                max: Math.max(...sortedEvents.map(e => e.magnitude)),
+                average:
+                  sortedEvents.reduce((sum, e) => sum + e.magnitude, 0) /
+                  sortedEvents.length,
+              }
+            : null,
+        feltCount: sortedEvents.filter(e => e.felt && e.felt > 0).length,
+      }
+
       return new Response(
         JSON.stringify({
-          error: 'Invalid type. Currently only "earthquake" is supported',
+          success: true,
+          events: paginatedEvents,
+          metadata: {
+            type,
+            requestedAt: new Date().toISOString(),
+            region: "Costa Rica",
+            dateRange: {
+              start: params.startDate,
+              end: params.endDate,
+              adjustedStart: hasFilters ? adjustedParams.startDate : undefined,
+            },
+            pagination: {
+              total: sortedEvents.length,
+              limit,
+              offset,
+              hasMore: offset + limit < sortedEvents.length,
+            },
+            stats,
+            sources: {
+              usgs: usgsEvents.status === "fulfilled" ? "success" : "failed",
+              ovsicori:
+                ovsicoriEvents.status === "fulfilled" ? "partial" : "failed",
+              rsn: rsnEvents.status === "fulfilled" ? "success" : "failed",
+            },
+            notes: [
+              "USGS includes earthquakes M2.5+ in Costa Rica region",
+              "OVSICORI includes recent earthquakes from the public table feed",
+              "When filters are applied, data from previous month is fetched for better filtering options",
+              "When specific source is requested, all events from that source are returned without deduplication",
+              "Duplicates across sources are automatically removed based on time/location proximity when no source filter is applied",
+            ],
+          },
         }),
         {
-          status: 400,
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      )
+    } catch (error) {
+      console.error("Service error:", error)
+
+      return new Response(
+        JSON.stringify({
+          error:
+            error instanceof Error ? error.message : "Unknown error occurred",
+          success: false,
+        }),
+        {
+          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       )
     }
-
-    // Adjust date range when filters are present
-    let adjustedParams = { ...params }
-    const hasFilters =
-      params.source ||
-      params.minMagnitude ||
-      params.lat ||
-      params.lon ||
-      params.radiusKm
-
-    if (hasFilters && params.startDate) {
-      const startDate = new Date(params.startDate)
-      // Go back one month to get more data for filtering
-      startDate.setMonth(startDate.getMonth() - 1)
-      adjustedParams.startDate = startDate.toISOString().split("T")[0] // YYYY-MM-DD format
-    }
-
-    // Fetch from all available sources in parallel
-    const [usgsEvents, ovsicoriEvents, rsnEvents] = await Promise.allSettled([
-      fetchUSGSData(hasFilters ? adjustedParams : params),
-      fetchOVSICORIData(hasFilters ? adjustedParams : params),
-      fetchRSNData(hasFilters ? adjustedParams : params),
-    ])
-
-    const allEvents: SeismicEvent[] = []
-
-    // Collect USGS events
-    if (usgsEvents.status === "fulfilled") {
-      allEvents.push(...usgsEvents.value)
-    } else {
-      console.error("USGS fetch failed:", usgsEvents.reason)
-    }
-
-    // Collect OVSICORI events
-    if (ovsicoriEvents.status === "fulfilled") {
-      allEvents.push(...ovsicoriEvents.value)
-    } else {
-      console.error("OVSICORI fetch failed:", ovsicoriEvents.reason)
-    }
-    // Collect RSN events
-    if (rsnEvents.status === "fulfilled") {
-      allEvents.push(...rsnEvents.value)
-    } else {
-      console.error("RSN fetch failed:", rsnEvents.reason)
-    }
-
-    // Filter events by requested date range (if provided) to avoid returning
-    // a full month of OVSICORI data when callers requested a narrower window.
-    const filterEventsByDateRange = (
-      events: SeismicEvent[],
-      start?: string,
-      end?: string,
-    ) => {
-      if (!start && !end) return events
-
-      const startTs = start
-        ? new Date(start).getTime()
-        : new Date().getTime() - 24 * 60 * 60 * 1000
-      const endTs = end ? new Date(end).getTime() : new Date().getTime()
-
-      return events.filter(e => e.time >= startTs && e.time <= endTs)
-    }
-
-    const filteredEvents = filterEventsByDateRange(
-      allEvents,
-      params.startDate as string,
-      params.endDate as string,
-    )
-
-    // Filter events by magnitude range
-    const magnitudeFilteredEvents = filteredEvents.filter(event => {
-      const meetsMin =
-        params.minMagnitude !== undefined
-          ? event.magnitude >= params.minMagnitude
-          : true
-      const meetsMax =
-        params.maxMagnitude !== undefined
-          ? event.magnitude <= params.maxMagnitude
-          : true
-      return meetsMin && meetsMax
-    })
-
-    // Apply location filtering if requested
-    const locationFilteredEvents = filterEventsByLocation(
-      magnitudeFilteredEvents,
-      params.lat,
-      params.lon,
-      params.radiusKm,
-    )
-
-    // If source filter is applied, return all events from that source (no deduplication)
-    // Otherwise, deduplicate events and return the merged result
-    let processedEvents: SeismicEvent[]
-    if (params.source) {
-      processedEvents = locationFilteredEvents.filter(
-        event => event.source === params.source,
-      )
-    } else {
-      // Deduplicate when no specific source is requested
-      processedEvents = deduplicateEvents(locationFilteredEvents)
-    }
-
-    const sortedEvents = sortEvents(processedEvents)
-    console.log({
-      mEvents: allEvents.filter(
-        ({ source }: { source: string }) => source.toLowerCase() === "rsn",
-      ),
-      rsnEvents,
-    })
-
-    // Apply pagination if requested
-    const limit = params.limit || sortedEvents.length
-    const offset = params.offset || 0
-    const paginatedEvents = sortedEvents.slice(offset, offset + limit)
-
-    // Calculate statistics (on full dataset)
-    const stats = {
-      total: sortedEvents.length,
-      sources: {
-        usgs: sortedEvents.filter(e => e.source === "usgs").length,
-        ovsicori: sortedEvents.filter(e => e.source === "ovsicori").length,
-        rsn: sortedEvents.filter(e => e.source === "rsn").length,
-        manual: sortedEvents.filter(e => e.source === "manual").length,
-      },
-      magnitudeRange:
-        sortedEvents.length > 0
-          ? {
-              min: Math.min(...sortedEvents.map(e => e.magnitude)),
-              max: Math.max(...sortedEvents.map(e => e.magnitude)),
-              average:
-                sortedEvents.reduce((sum, e) => sum + e.magnitude, 0) /
-                sortedEvents.length,
-            }
-          : null,
-      feltCount: sortedEvents.filter(e => e.felt && e.felt > 0).length,
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        events: paginatedEvents,
-        metadata: {
-          type,
-          requestedAt: new Date().toISOString(),
-          region: "Costa Rica",
-          dateRange: {
-            start: params.startDate,
-            end: params.endDate,
-            adjustedStart: hasFilters ? adjustedParams.startDate : undefined,
-          },
-          pagination: {
-            total: sortedEvents.length,
-            limit,
-            offset,
-            hasMore: offset + limit < sortedEvents.length,
-          },
-          stats,
-          sources: {
-            usgs: usgsEvents.status === "fulfilled" ? "success" : "failed",
-            ovsicori:
-              ovsicoriEvents.status === "fulfilled" ? "partial" : "failed",
-            rsn: rsnEvents.status === "fulfilled" ? "success" : "failed",
-          },
-          notes: [
-            "USGS includes earthquakes M2.5+ in Costa Rica region",
-            "OVSICORI integration pending - needs HTML parsing implementation",
-            "When filters are applied, data from previous month is fetched for better filtering options",
-            "When specific source is requested, all events from that source are returned without deduplication",
-            "Duplicates are automatically removed based on time/location proximity when no source filter is applied",
-          ],
-        },
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    )
-  } catch (error) {
-    console.error("Service error:", error)
-
-    return new Response(
-      JSON.stringify({
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred",
-        success: false,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    )
-  }
-})
+  }),
+)

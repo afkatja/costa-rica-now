@@ -30,7 +30,7 @@ const GoogleMapsWrapper = ({
   destinations,
   radarOpacity,
   withRadar = false,
-  className = ''
+  className = "",
 }: GoogleMapsWrapperProps) => {
   const [loaded, setLoaded] = useState(false)
 
@@ -43,11 +43,8 @@ const GoogleMapsWrapper = ({
     }))
   }, [destinations])
 
-  const MAX_MARKERS = 300
-  const visibleDestinations = useMemo(
-    () => destinationList.slice(0, MAX_MARKERS),
-    [destinationList]
-  )
+  // Removed arbitrary marker limit; clustering will handle visibility efficiently
+  const visibleDestinations = useMemo(() => destinationList, [destinationList])
 
   return (
     <APIProvider apiKey={apiKey}>
