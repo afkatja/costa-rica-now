@@ -6,6 +6,19 @@ import RadarMap from "./RadarMap"
 
 const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY!
 
+const ApiReadyWatcher = ({
+  onReady,
+}: {
+  onReady: (ready: boolean) => void
+}) => {
+  const ready = useApiIsLoaded()
+  useEffect(() => {
+    onReady(ready)
+  }, [ready, onReady])
+
+  return null
+}
+
 interface GoogleMapsWrapperProps {
   destinations: any[] | Record<string, any> | null
   radarOpacity?: number
@@ -35,19 +48,6 @@ const GoogleMapsWrapper = ({
     () => destinationList.slice(0, MAX_MARKERS),
     [destinationList]
   )
-
-  const ApiReadyWatcher = ({
-    onReady,
-  }: {
-    onReady: (ready: boolean) => void
-  }) => {
-    const ready = useApiIsLoaded()
-    useEffect(() => {
-      onReady(ready)
-    }, [ready, onReady])
-
-    return null
-  }
 
   return (
     <APIProvider apiKey={apiKey}>
