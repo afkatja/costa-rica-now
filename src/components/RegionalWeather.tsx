@@ -1,5 +1,4 @@
 "use client"
-import React from "react"
 import { useTranslations } from "next-intl"
 
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
@@ -96,7 +95,7 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
     <Card>
       <CardHeader>
         <CardTitle className="text-lg font-bold">
-          {t("Title")}
+          {t("title")}
           <span className="text-sm font-normal text-muted-foreground ml-2">
             {getTitle()}
           </span>
