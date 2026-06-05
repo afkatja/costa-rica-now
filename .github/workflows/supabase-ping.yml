@@ -2,7 +2,7 @@ name: Ping Supabase
 
 on:
   schedule:
-    # Run every 5 days at midnight UTC (days 5, 10, 15, 20, 25, 30)
+    # Run every 5 days at midnight UTC (days 1, 6, 11, 16, 21, 26, 31)
     - cron: '0 0 */5 * *'
   workflow_dispatch: # Allow manual triggering
 
@@ -23,7 +23,7 @@ jobs:
           fi
           
           echo "Pinging Supabase at ${{ secrets.SUPABASE_URL }}"
-          curl -f -s -o /dev/null -w "HTTP Status: %{http_code}\n" "${{ secrets.SUPABASE_URL }}"
+          curl -f -s -o /dev/null -w "HTTP Status: %{http_code}\n" --connect-timeout 10 --max-time 30 "${{ secrets.SUPABASE_URL }}"
           
           if [ $? -eq 0 ]; then
             echo "Successfully pinged Supabase"
