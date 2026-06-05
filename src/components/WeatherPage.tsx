@@ -5,7 +5,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 
 import { useTranslations } from "next-intl"
 import { useGeolocation } from "../hooks/use-geolocation"
-import { useWeatherData, WeatherData } from "../providers/WeatherDataProvider"
+import {
+  useWeatherData,
+  WeatherData,
+  ForecastData,
+} from "../providers/WeatherDataProvider"
 import {
   Droplets,
   MapPin,
@@ -24,29 +28,6 @@ import Radar from "./Radar"
 import GoogleMapsWrapper from "./GoogleMapsWrapper"
 import RegionalWeather, { TabOfRegional } from "./RegionalWeather"
 import { stringToEnum } from "../lib/utils"
-
-interface ForecastData {
-  location: string
-  name: string
-  type: string
-  forecast: Array<{
-    date: string
-    day: string
-    high: number
-    low: number
-    avg_temp: number
-    avg_feels_like: number
-    avg_humidity: number
-    avg_wind_speed: number
-    total_rain: number
-    description: string
-    main: string
-    icon: string
-  }>
-  city: string
-  country: string
-  cached_at: string
-}
 
 const getWeatherIcon = (iconCode: string) => {
   return `https://openweathermap.org/img/wn/${iconCode}@2x.png`
@@ -107,11 +88,12 @@ export function WeatherPage() {
   const t = useTranslations("WeatherPage")
   const [activeTab, setActiveTab] = useState(TabOfRegional.Weather)
   const [locationName, setLocationName] = useState("San José")
-  const [forecastData, setForecastData] = useState<ForecastData[] | null>(null)
+  const [userForecast, setUserForecast] = useState<ForecastData | null>(null)
 
   // Use Weather Data Provider
   const {
     weatherData: allWeatherData,
+    forecastData: forecastFromProvider,
     loading: providerLoading,
     errors: providerErrors,
     refreshWeather,
@@ -166,13 +148,15 @@ export function WeatherPage() {
 
       // Find forecast data for user location
       if (userWeather && allWeatherData.length > 0) {
-        // For now, use the same data structure - would need forecast data from provider
-        setForecastData(null)
+        const forecastEntry = forecastFromProvider.find(
+          (f: ForecastData) => f.location === userWeather.location,
+        )
+        setUserForecast(forecastEntry || null)
       }
     } else {
       refreshWeather()
     }
-  }, [allWeatherData, position, isInCostaRica])
+  }, [allWeatherData, forecastFromProvider, position, isInCostaRica])
 
   // Request location permission on mount
   useEffect(() => {
@@ -215,7 +199,7 @@ export function WeatherPage() {
 
       {/* 5-Day Forecast */}
       <WeatherForecast
-        forecastData={forecastData}
+        forecastData={userForecast}
         locationName={locationName}
       />
 

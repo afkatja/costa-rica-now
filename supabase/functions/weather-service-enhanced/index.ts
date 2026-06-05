@@ -1,4 +1,5 @@
 import costaRicaDestinations from "../../../src/lib/shared/destinations.ts"
+import calculateDistance from "../_shared/calculateDistance.ts"
 import { corsHeaders } from "../_shared/cors.ts"
 
 Deno.serve(async req => {
@@ -20,22 +21,73 @@ Deno.serve(async req => {
 
     const weatherData = []
 
-    // Default behavior: use provided locations or all major destinations
-    const locationsToFetch =
-      locations && locations.length > 0
-        ? locations
-            .map((loc: keyof typeof costaRicaDestinations) =>
-              costaRicaDestinations[loc]
-                ? { key: loc, ...costaRicaDestinations[loc] }
-                : undefined
-            )
-            .filter(Boolean)
-        : Object.entries(costaRicaDestinations).map(([key, dest]) => ({
-            key,
-            name: dest.name,
-            lat: dest.lat,
-            lon: dest.lon,
-          }))
+    // If user has location context and is in Costa Rica, prioritize their location
+    let locationsToFetch
+    if (
+      locationContext &&
+      locationContext.isInCostaRica &&
+      locationContext.latitude &&
+      locationContext.longitude
+    ) {
+      // Add user's location first, then nearby destinations within radius
+      locationsToFetch = []
+
+      // Add user's current location
+      locationsToFetch.push({
+        key: "user-location",
+        name: "Your Location",
+        lat: locationContext.latitude,
+        lon: locationContext.longitude,
+      })
+
+      // Add nearby destinations within radius
+      const nearbyDestinations = Object.entries(costaRicaDestinations).filter(
+        ([key, dest]) => {
+          const distance = calculateDistance(
+            locationContext.latitude,
+            locationContext.longitude,
+            dest.lat,
+            dest.lon
+          )
+          return distance <= locationContext.radiusKm
+        }
+      )
+
+      // Add nearby destinations (limit to 3 to keep response manageable)
+      locationsToFetch.push(
+        ...nearbyDestinations.slice(0, 3).map(([key, dest]) => ({
+          key,
+          name: dest.name,
+          lat: dest.lat,
+          lon: dest.lon,
+        }))
+      )
+
+      // If no nearby destinations, add some popular ones
+      if (locationsToFetch.length === 1) {
+        locationsToFetch.push(
+          { key: "san-jose", ...costaRicaDestinations["san-jose"] },
+          { key: "manuel-antonio", ...costaRicaDestinations["manuel-antonio"] }
+        )
+      }
+    } else {
+      // Default behavior: use provided locations or all major destinations
+      locationsToFetch =
+        locations && locations.length > 0
+          ? locations
+              .map((loc: keyof typeof costaRicaDestinations) =>
+                costaRicaDestinations[loc]
+                  ? { key: loc, ...costaRicaDestinations[loc] }
+                  : undefined
+              )
+              .filter(Boolean)
+          : Object.entries(costaRicaDestinations).map(([key, dest]) => ({
+              key,
+              name: dest.name,
+              lat: dest.lat,
+              lon: dest.lon,
+            }))
+    }
 
     // Fetch all requested types for each location
     for (const location of locationsToFetch) {
