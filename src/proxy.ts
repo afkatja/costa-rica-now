@@ -9,7 +9,7 @@ const intlMiddleware = createMiddleware({
   localeDetection: true,
 })
 
-export default function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   console.log("Middleware processing:", request.nextUrl.pathname)
 
   // Handle internationalization
