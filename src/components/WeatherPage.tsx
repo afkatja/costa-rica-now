@@ -5,7 +5,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 
 import { useTranslations } from "next-intl"
 import { useGeolocation } from "../hooks/use-geolocation"
-import { useWeatherData, WeatherData } from "../providers/WeatherDataProvider"
+import {
+  useWeatherData,
+  WeatherData,
+  ForecastData,
+} from "../providers/WeatherDataProvider"
 import {
   Droplets,
   MapPin,
@@ -25,29 +29,6 @@ import GoogleMapsWrapper from "./GoogleMapsWrapper"
 import RegionalWeather, { TabOfRegional } from "./RegionalWeather"
 import { stringToEnum } from "../lib/utils"
 
-interface ForecastData {
-  location: string
-  name: string
-  type: string
-  forecast: Array<{
-    date: string
-    day: string
-    high: number
-    low: number
-    avg_temp: number
-    avg_feels_like: number
-    avg_humidity: number
-    avg_wind_speed: number
-    total_rain: number
-    description: string
-    main: string
-    icon: string
-  }>
-  city: string
-  country: string
-  cached_at: string
-}
-
 const getWeatherIcon = (iconCode: string) => {
   return `https://openweathermap.org/img/wn/${iconCode}@2x.png`
 }
@@ -56,7 +37,7 @@ const getDestinations = (weatherData: WeatherData[] | null) => {
   if (!weatherData) return null
   const weatherMap: Record<string, WeatherData> = {}
   weatherData.forEach(
-    (weather: WeatherData) => (weatherMap[weather.location] = weather)
+    (weather: WeatherData) => (weatherMap[weather.location] = weather),
   )
 
   const destinations = Object.entries(costaRicaDestinations).map(
@@ -98,7 +79,7 @@ const getDestinations = (weatherData: WeatherData[] | null) => {
           </MapTooltipContent>
         ),
       }
-    }
+    },
   )
   return destinations
 }
@@ -107,11 +88,12 @@ export function WeatherPage() {
   const t = useTranslations("WeatherPage")
   const [activeTab, setActiveTab] = useState(TabOfRegional.Weather)
   const [locationName, setLocationName] = useState("San José")
-  const [forecastData, setForecastData] = useState<ForecastData[] | null>(null)
+  const [userForecast, setUserForecast] = useState<ForecastData | null>(null)
 
   // Use Weather Data Provider
   const {
     weatherData: allWeatherData,
+    forecastData: forecastFromProvider,
     loading: providerLoading,
     errors: providerErrors,
     refreshWeather,
@@ -129,7 +111,7 @@ export function WeatherPage() {
   useEffect(() => {
     if (allWeatherData && allWeatherData.length > 0) {
       let userWeather = allWeatherData.find(
-        (w: any) => w.location === "san-jose" // Default
+        (w: any) => w.location === "san-jose", // Default
       )
 
       // If user is in Costa Rica, use their closest location
@@ -148,11 +130,11 @@ export function WeatherPage() {
 
           const prevDist = Math.sqrt(
             Math.pow(prevDest.lat - position.latitude, 2) +
-              Math.pow(prevDest.lon - position.longitude, 2)
+              Math.pow(prevDest.lon - position.longitude, 2),
           )
           const currDist = Math.sqrt(
             Math.pow(currDest.lat - position.latitude, 2) +
-              Math.pow(currDest.lon - position.longitude, 2)
+              Math.pow(currDest.lon - position.longitude, 2),
           )
 
           return currDist < prevDist ? curr : prev
@@ -166,11 +148,15 @@ export function WeatherPage() {
 
       // Find forecast data for user location
       if (userWeather && allWeatherData.length > 0) {
-        // For now, use the same data structure - would need forecast data from provider
-        setForecastData(null)
+        const forecastEntry = forecastFromProvider.find(
+          (f: ForecastData) => f.location === userWeather.location,
+        )
+        setUserForecast(forecastEntry || null)
       }
+    } else {
+      refreshWeather()
     }
-  }, [allWeatherData, position, isInCostaRica])
+  }, [allWeatherData, forecastFromProvider, position, isInCostaRica])
 
   // Request location permission on mount
   useEffect(() => {
@@ -202,7 +188,7 @@ export function WeatherPage() {
           allWeatherData?.find(
             (w: any) =>
               w.location ===
-              (position && isInCostaRica ? "closest" : "san-jose")
+              (position && isInCostaRica ? "closest" : "san-jose"),
           ) || allWeatherData?.[0]
         }
         weatherLoading={providerLoading.weather}
@@ -213,7 +199,7 @@ export function WeatherPage() {
 
       {/* 5-Day Forecast */}
       <WeatherForecast
-        forecastData={forecastData}
+        forecastData={userForecast}
         locationName={locationName}
       />
 
@@ -226,7 +212,7 @@ export function WeatherPage() {
             value={activeTab}
             onValueChange={val =>
               setActiveTab(
-                stringToEnum(val, TabOfRegional) || TabOfRegional.Weather
+                stringToEnum(val, TabOfRegional) || TabOfRegional.Weather,
               )
             }
             className="w-full"
