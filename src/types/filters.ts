@@ -1,16 +1,12 @@
-// Filter enums for iteration and type safety
-export enum TimeFilter {
-  All = "allTime",
-  Last24Hours = "24h",
-  Last3Days = "3d",
-  Week = "week",
-  Month = "month",
-}
+// Re-export filter enums from shared types for backward compatibility
+// These enums provide iteration and type safety for filter options
+export { TimeFilter, SourceFilter } from "./shared"
 
-export enum SourceFilter {
-  All = "allSources",
-  USGS = "usgs",
-  OVSICORI = "ovsicori",
-  RSN = "rsn",
-  Manual = "manual",
-}
+// Additional filter-specific types that extend the shared types
+export type {
+  SeismicFilters,
+  MagnitudeFilter,
+  LocationFilter,
+  SeismicFilterActions,
+  FilterValidationResult,
+} from "./shared"

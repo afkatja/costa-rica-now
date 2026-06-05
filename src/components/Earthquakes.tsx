@@ -1,5 +1,5 @@
-import React, { useState, useMemo, memo } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
+import React, { memo } from "react"
+import { TabsContent } from "./ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import {
@@ -24,8 +24,6 @@ import {
   MapPin,
   Clock,
   AlertTriangle,
-  Mountain,
-  Thermometer,
   TrendingUp,
   Filter,
   X,
@@ -34,36 +32,26 @@ import {
 import { useTranslations } from "next-intl"
 import { SeismicEvent } from "../types/seismic"
 import { useGeolocation } from "../hooks/use-geolocation"
+import { usePagination } from "../hooks/use-pagination"
 import LoadingSpinner from "./Loader"
-import { TimeFilter, SourceFilter } from "../types/filters"
+import { FilterSummaryBadges } from "./FilterSummaryBadges"
+import {
+  EarthquakesProps as SharedEarthquakesProps,
+  TimeFilter,
+  SourceFilter,
+} from "../types/shared"
+import { DISTANCE_THRESHOLDS, MAGNITUDE_THRESHOLDS } from "../constants/seismic"
+import { SEISMIC_CONFIG } from "../config/seismic"
+import {
+  hasActiveFilters,
+  createMagnitudeFilter,
+  createLocationFilter,
+  safeFilterOperation,
+} from "../utils/filter-helpers"
+import { formatDateTime } from "../utils/date-formatter"
 
-interface EarthquakesProps {
-  earthquakes: SeismicEvent[] | null
-  totalCount: number
-  stats: any
-  currentPage: number
-  itemsPerPage: number
-  loading?: boolean
-  onPageChange: (page: number) => void
-  filters?: {
-    timeFilter: TimeFilter
-    magnitudeFilter: boolean
-    sourceFilter: SourceFilter
-    locationFilter: boolean
-  }
-  onFilterChange?: {
-    setTimeFilter: (value: TimeFilter) => void
-    setMagnitudeFilter: (value: boolean) => void
-    setSourceFilter: (value: SourceFilter) => void
-    setLocationFilter: (value: boolean) => void
-  }
-  position?: {
-    latitude: number
-    longitude: number
-    accuracy?: number
-  } | null
-  requestLocation?: () => void
-}
+// Use the shared EarthquakesProps interface
+type EarthquakesProps = SharedEarthquakesProps
 
 // Memoized individual earthquake item to prevent unnecessary re-renders
 interface EarthquakeItemProps {
@@ -120,7 +108,7 @@ const EarthquakeItem = memo(function EarthquakeItem({
           <Clock className="h-4 w-4" />
           {earthquake.formattedDateTime ||
             earthquake.formattedTime ||
-            new Date(earthquake.time).toLocaleString("es-CR")}
+            formatDateTime(earthquake.time)}
         </div>
         <div className="text-sm text-muted-foreground">
           {t("depth")}:{" "}
@@ -151,162 +139,78 @@ const Earthquakes = ({
 }: EarthquakesProps) => {
   const t = useTranslations("Earthquakes")
 
-  // Use filter props if provided, otherwise fall back to local state for backwards compatibility
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>(
-    filters?.timeFilter || TimeFilter.All,
-  )
-  const [magnitudeFilter, setMagnitudeFilter] = useState(
-    filters?.magnitudeFilter || false,
-  )
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(
-    filters?.sourceFilter || SourceFilter.All,
-  )
-  const [locationFilter, setLocationFilter] = useState(
-    filters?.locationFilter || false,
-  )
-
-  // Sync with props when they change
-  React.useEffect(() => {
-    if (filters) {
-      setTimeFilter(filters.timeFilter)
-      setMagnitudeFilter(filters.magnitudeFilter)
-      setSourceFilter(filters.sourceFilter)
-      setLocationFilter(filters.locationFilter)
-    }
-  }, [filters])
-
   const geolocation = useGeolocation()
   const currentPosition = position || geolocation.position
   const currentRequestLocation = requestLocation || geolocation.requestLocation
-  // const isWithinRadius = geolocation.isWithinRadius
 
-  // Filter handlers - use props if provided, otherwise update local state
+  // Filter handlers
   const handleTimeFilterChange = (value: TimeFilter) => {
-    if (onFilterChange?.setTimeFilter) {
-      onFilterChange.setTimeFilter(value)
-    } else {
-      setTimeFilter(value)
-    }
+    onFilterChange.setTimeFilter(value)
   }
 
   const handleMagnitudeFilterChange = (value: string) => {
-    const newValue = value === "5+"
-    if (onFilterChange?.setMagnitudeFilter) {
-      onFilterChange.setMagnitudeFilter(newValue)
-    } else {
-      setMagnitudeFilter(newValue)
-    }
+    const filter = safeFilterOperation(
+      () => createMagnitudeFilter(value),
+      { enabled: false, minimum: undefined },
+      "Failed to create magnitude filter",
+    )
+    onFilterChange.setMagnitudeFilter(filter)
   }
 
   const handleSourceFilterChange = (value: SourceFilter) => {
-    if (onFilterChange?.setSourceFilter) {
-      onFilterChange.setSourceFilter(value)
-    } else {
-      setSourceFilter(value)
-    }
+    onFilterChange.setSourceFilter(value)
   }
 
   const handleLocationFilterToggle = () => {
     if (!currentPosition) {
       currentRequestLocation?.()
     }
-    const newValue = !locationFilter
-    if (onFilterChange?.setLocationFilter) {
-      onFilterChange.setLocationFilter(newValue)
-    } else {
-      setLocationFilter(newValue)
-    }
+
+    const filter = safeFilterOperation(
+      () =>
+        createLocationFilter(
+          !filters.locationFilter.enabled,
+          currentPosition,
+          DISTANCE_THRESHOLDS.DEFAULT_RADIUS,
+        ),
+      { enabled: false, radiusKm: DISTANCE_THRESHOLDS.DEFAULT_RADIUS },
+      "Failed to create location filter",
+    )
+
+    onFilterChange.setLocationFilter(filter)
   }
 
   const clearAllFilters = () => {
-    if (onFilterChange) {
-      onFilterChange.setTimeFilter(TimeFilter.All)
-      onFilterChange.setMagnitudeFilter(false)
-      onFilterChange.setSourceFilter(SourceFilter.All)
-      onFilterChange.setLocationFilter(false)
-    } else {
-      setTimeFilter(TimeFilter.All)
-      setMagnitudeFilter(false)
-      setSourceFilter(SourceFilter.All)
-      setLocationFilter(false)
-    }
+    onFilterChange.clearAllFilters()
   }
 
   const getMagnitudeColor = (magnitude: number) => {
-    if (magnitude >= 6) return "text-red-600"
-    if (magnitude >= 4.5) return "text-orange-500"
-    if (magnitude >= 3) return "text-yellow-600"
+    if (magnitude >= MAGNITUDE_THRESHOLDS.SIGNIFICANT) return "text-gray-100"
+    if (magnitude >= MAGNITUDE_THRESHOLDS.MODERATE) return "text-orange-500"
+    if (magnitude >= MAGNITUDE_THRESHOLDS.LIGHT) return "text-yellow-600"
     return "text-green-600"
   }
 
   const getMagnitudeBadge = (magnitude: number) => {
-    if (magnitude >= 6) return "destructive"
-    if (magnitude >= 4.5) return "secondary"
+    if (magnitude >= MAGNITUDE_THRESHOLDS.SIGNIFICANT) return "destructive"
+    if (magnitude >= MAGNITUDE_THRESHOLDS.MODERATE) return "secondary"
     return "outline"
   }
 
   const maxMagnitude = stats?.magnitudeRange?.max || null
 
-  // Check if we should show server-side filtered results
-  const isServerSideFiltered = filters !== undefined
+  // Use pagination hook
+  const { totalPages, startIndex, endIndex, paginationPages } = usePagination({
+    currentPage,
+    totalCount,
+    itemsPerPage,
+  })
 
-  // Pagination for filtered results
-  const filteredTotalCount = isServerSideFiltered
-    ? totalCount
-    : earthquakes?.length || 0
-  const totalPages = Math.ceil(filteredTotalCount / itemsPerPage)
-  const displayEarthquakes = isServerSideFiltered
-    ? earthquakes
-    : earthquakes?.slice(0, filteredTotalCount) || []
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedEarthquakes = isServerSideFiltered
-    ? displayEarthquakes || []
-    : (displayEarthquakes || []).slice(startIndex, startIndex + itemsPerPage)
+  // Get paginated earthquakes for current page
+  const paginatedEarthquakes = earthquakes?.slice(startIndex, endIndex) || []
 
-  // Generate pagination pages with ellipsis
-  const getPaginationPages = () => {
-    const pages: (number | string)[] = []
-    const showEllipsisThreshold = 7
-
-    if (totalPages <= showEllipsisThreshold) {
-      // Show all pages if total is small
-      return Array.from({ length: totalPages }, (_, i) => i + 1)
-    }
-
-    // Always show first page
-    pages.push(1)
-
-    if (currentPage <= 4) {
-      // Near the beginning
-      pages.push(2, 3, 4, 5)
-      pages.push("...")
-    } else if (currentPage >= totalPages - 3) {
-      // Near the end
-      pages.push("...")
-      pages.push(totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1)
-    } else {
-      // In the middle
-      pages.push("...")
-      pages.push(currentPage - 1, currentPage, currentPage + 1)
-      pages.push("...")
-    }
-
-    // Always show last page
-    pages.push(totalPages)
-
-    return pages
-  }
-
-  const hasActiveFilters = isServerSideFiltered
-    ? filters &&
-      (filters.timeFilter !== TimeFilter.All ||
-        filters.magnitudeFilter ||
-        filters.sourceFilter !== SourceFilter.All ||
-        filters.locationFilter)
-    : timeFilter !== TimeFilter.All ||
-      magnitudeFilter ||
-      sourceFilter !== SourceFilter.All ||
-      locationFilter
+  // Check if any filters are active using helper function
+  const hasActiveFiltersValue = hasActiveFilters(filters)
 
   if (loading) {
     return (
@@ -333,9 +237,9 @@ const Earthquakes = ({
             <div className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-blue-500" />
               <div>
-                <div className="text-2xl font-medium">{filteredTotalCount}</div>
+                <div className="text-2xl font-medium">{totalCount}</div>
                 <div className="text-sm text-muted-foreground">
-                  {hasActiveFilters
+                  {hasActiveFiltersValue
                     ? t("filteredResults")
                     : t("earthquakesLast7Days")}
                 </div>
@@ -383,7 +287,7 @@ const Earthquakes = ({
               <Filter className="h-5 w-5" />
               {t("filters")}
             </CardTitle>
-            {hasActiveFilters && (
+            {hasActiveFiltersValue && (
               <Button variant="outline" size="sm" onClick={clearAllFilters}>
                 <X className="h-4 w-4 mr-1" />
                 {t("clearFilters")}
@@ -397,7 +301,7 @@ const Earthquakes = ({
             <div className="space-y-2">
               <label className="text-sm font-medium">{t("timePeriod")}</label>
               <Select
-                value={timeFilter}
+                value={filters.timeFilter}
                 onValueChange={handleTimeFilterChange}
                 defaultValue={TimeFilter.All}
               >
@@ -420,7 +324,11 @@ const Earthquakes = ({
                 {t("minimumMagnitude")}
               </label>
               <Select
-                value={magnitudeFilter ? "5+" : "all"}
+                value={
+                  filters.magnitudeFilter?.enabled
+                    ? SEISMIC_CONFIG.MAGNITUDE_FILTER_VALUE
+                    : "all"
+                }
                 onValueChange={handleMagnitudeFilterChange}
               >
                 <SelectTrigger>
@@ -428,7 +336,9 @@ const Earthquakes = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t("allMagnitudes")}</SelectItem>
-                  <SelectItem value="5+">M 5.0+</SelectItem>
+                  <SelectItem value={SEISMIC_CONFIG.MAGNITUDE_FILTER_VALUE}>
+                    M {SEISMIC_CONFIG.MIN_MAGNITUDE_FILTER}.0+
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -437,7 +347,7 @@ const Earthquakes = ({
             <div className="space-y-2">
               <label className="text-sm font-medium">{t("source")}</label>
               <Select
-                value={sourceFilter}
+                value={filters.sourceFilter}
                 onValueChange={handleSourceFilterChange}
               >
                 <SelectTrigger>
@@ -458,7 +368,9 @@ const Earthquakes = ({
               <label className="text-sm font-medium">{t("nearby")}</label>
               <div className="space-y-2">
                 <Button
-                  variant={locationFilter ? "default" : "outline"}
+                  variant={
+                    filters.locationFilter?.enabled ? "default" : "outline"
+                  }
                   size="sm"
                   onClick={handleLocationFilterToggle}
                   className="w-full"
@@ -466,7 +378,7 @@ const Earthquakes = ({
                   <Navigation className="h-4 w-4 mr-2" />
                   {currentPosition ? t("within50km") : t("enableLocation")}
                 </Button>
-                {locationFilter && !currentPosition && (
+                {filters.locationFilter?.enabled && !currentPosition && (
                   <p className="text-xs text-muted-foreground">
                     {t("locationRequired")}
                   </p>
@@ -476,51 +388,18 @@ const Earthquakes = ({
           </div>
 
           {/* Active Filters Summary */}
-          {hasActiveFilters && (
-            <div className="mt-4 pt-4 border-t">
-              <div className="flex flex-wrap gap-2">
-                {timeFilter !== TimeFilter.All && (
-                  <Badge variant="secondary">
-                    {timeFilter === TimeFilter.Last24Hours && t("24h")}
-                    {timeFilter === TimeFilter.Last3Days && t("3d")}
-                    {timeFilter === TimeFilter.Week && t("week")}
-                    {timeFilter === TimeFilter.Month && t("month")}
-                    <X
-                      className="h-3 w-3 ml-1 cursor-pointer"
-                      onClick={() => handleTimeFilterChange(TimeFilter.All)}
-                    />
-                  </Badge>
-                )}
-                {magnitudeFilter && (
-                  <Badge variant="secondary">
-                    M 5.0+
-                    <X
-                      className="h-3 w-3 ml-1 cursor-pointer"
-                      onClick={() => handleMagnitudeFilterChange("all")}
-                    />
-                  </Badge>
-                )}
-                {sourceFilter !== SourceFilter.All && (
-                  <Badge variant="secondary">
-                    {sourceFilter.toUpperCase()}
-                    <X
-                      className="h-3 w-3 ml-1 cursor-pointer"
-                      onClick={() => handleSourceFilterChange(SourceFilter.All)}
-                    />
-                  </Badge>
-                )}
-                {locationFilter && currentPosition && (
-                  <Badge variant="secondary">
-                    {t("within50km")}
-                    <X
-                      className="h-3 w-3 ml-1 cursor-pointer"
-                      onClick={() => handleLocationFilterToggle()}
-                    />
-                  </Badge>
-                )}
-              </div>
-            </div>
-          )}
+          <FilterSummaryBadges
+            timeFilter={filters.timeFilter}
+            magnitudeFilter={filters.magnitudeFilter}
+            sourceFilter={filters.sourceFilter}
+            locationFilter={filters.locationFilter}
+            currentPosition={currentPosition}
+            onTimeFilterChange={handleTimeFilterChange}
+            onMagnitudeFilterChange={handleMagnitudeFilterChange}
+            onSourceFilterChange={handleSourceFilterChange}
+            onLocationFilterToggle={handleLocationFilterToggle}
+            t={t}
+          />
         </CardContent>
       </Card>
 
@@ -532,7 +411,7 @@ const Earthquakes = ({
         <CardContent>
           {paginatedEarthquakes.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              {hasActiveFilters ? t("noFilteredResults") : t("noData")}
+              {hasActiveFiltersValue ? t("noFilteredResults") : t("noData")}
             </div>
           ) : (
             <div className="space-y-4">
@@ -563,7 +442,7 @@ const Earthquakes = ({
                   }
                 />
               </PaginationItem>
-              {getPaginationPages().map((page, index) => (
+              {paginationPages.map((page, index) => (
                 <PaginationItem key={index}>
                   {page === "..." ? (
                     <span className="px-3 py-2 text-muted-foreground">...</span>

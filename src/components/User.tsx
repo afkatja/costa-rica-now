@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Settings, LogOut, User as UserIcon, LogIn } from "lucide-react"
+import { Settings, LogOut, LogIn } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "../providers/auth-provider"
 import { createNavigation } from "next-intl/navigation"

@@ -1,12 +1,6 @@
 "use client"
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react"
+import React, { createContext, useContext, useState, ReactNode } from "react"
 import { supabase } from "../utils/supabase/client"
 import costaRicaDestinations, {
   coastalDestinations,

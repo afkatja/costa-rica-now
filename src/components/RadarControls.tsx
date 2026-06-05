@@ -3,7 +3,6 @@
 import { Play, Pause, SkipBack, SkipForward, RefreshCw } from "lucide-react"
 import { Button } from "./ui/button"
 import { Slider } from "./ui/slider"
-import { useTranslations } from "next-intl"
 
 interface RadarControlsProps {
   isPlaying: boolean
@@ -32,8 +31,6 @@ export function RadarControls({
   opacity,
   onOpacityChange,
 }: RadarControlsProps) {
-  const t = useTranslations("WeatherPage")
-
   const formatTime = (timestamp: number | null) => {
     if (!timestamp) return "--:--"
     const date = new Date(timestamp * 1000)
