@@ -5,20 +5,30 @@ import { useTranslations } from "next-intl"
 import { Waves } from "lucide-react"
 import Tides from "./Tides"
 
+/** Sea page tab identifiers */
 export enum TabOfSea {
   TidesAndWaves = "tides",
 }
 
 import { useSeaPage } from "../hooks/useWeatherData"
+import type { TideData } from "../providers/WeatherDataProvider"
 
+interface RegionalItem {
+  name: string
+  region: string
+  data: TideData
+  type: "tides"
+}
+
+/** Sea page — displays tide data and coastal conditions for Costa Rica beaches */
 export function SeaPage() {
   const t = useTranslations("SeaPage") // Use dedicated SeaPage translations
   const r = useTranslations("SeaPage.coastalConditions") // Use dedicated coastal conditions translations
   const { tidesData, refreshTides, loading, error } = useSeaPage()
 
-  const regionalData = tidesData
-    .filter((tide: any) => tide.available)
-    .map((tide: any) => ({
+  const regionalData: RegionalItem[] = tidesData
+    .filter((tide: TideData) => tide.available)
+    .map((tide: TideData) => ({
       name: tide.name,
       region: tide.region,
       data: tide,
@@ -104,7 +114,7 @@ export function SeaPage() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {regionalData.length > 0 ? (
-              regionalData.map((item: any, index) => (
+              regionalData.map((item: RegionalItem, index) => (
                 <div
                   key={`${item.region}-${item.type}-${index}`}
                   className={`p-4 rounded-lg border ${item.type}`}

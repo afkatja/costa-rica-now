@@ -12,7 +12,7 @@ import costaRicaDestinations, {
   coastalDestinations,
 } from "../lib/shared/destinations"
 
-// Type for beach data from API
+/** Raw beach conditions response from the /api/beaches endpoint */
 interface BeachApiResponse {
   tides: {
     extremes: Array<{ time: string; height: number; type: string }>
@@ -95,6 +95,7 @@ interface RadarData {
   lastUpdated: string | null
 }
 
+/** Tide and wave data for a single coastal location */
 export interface TideData {
   location: string
   name: string
@@ -286,7 +287,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
     }
   }
 
-  // Fetch tides data for coastal regions with caching and retry
+  /** Fetches tide and wave data for all coastal destinations with error handling */
   const refreshTides = useCallback(async () => {
     try {
       setLoading(prev => ({ ...prev, tides: true }))
@@ -322,8 +323,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
             surfConditions: beachData?.surfConditions || null,
             lastUpdated: beachData?.lastUpdated || null,
           } as TideData
-        } catch (err) {
-          // Log error but don't expose details
+        } catch {
           return null
         }
       })

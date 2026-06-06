@@ -5,6 +5,7 @@ import { useWeatherData } from "../providers/WeatherDataProvider"
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 const ERROR_RETRY_DELAY = 30 * 1000 // 30 seconds
 
+/** Hook for WeatherPage — auto-fetches weather on mount, provides retry with backoff */
 export function useWeatherPage() {
   const { weatherData, forecastData, refreshWeather, loading, errors } =
     useWeatherData()
@@ -15,7 +16,7 @@ export function useWeatherPage() {
     }
   }, [weatherData.length, refreshWeather])
 
-  // Error recovery with retry
+  /** Retries weather fetch after a 30-second backoff delay */
   const retryRefreshWeather = useCallback(async () => {
     await new Promise(resolve => setTimeout(resolve, ERROR_RETRY_DELAY))
     return refreshWeather()
@@ -31,6 +32,7 @@ export function useWeatherPage() {
   }
 }
 
+/** Hook for RadarPage — auto-fetches radar data on mount, provides retry with backoff */
 export function useRadarPage() {
   const { radarData, refreshRadar, loading, errors } = useWeatherData()
 
@@ -40,7 +42,7 @@ export function useRadarPage() {
     }
   }, [radarData.length, refreshRadar])
 
-  // Error recovery with retry
+  /** Retries radar fetch after a 30-second backoff delay */
   const retryRefreshRadar = useCallback(async () => {
     await new Promise(resolve => setTimeout(resolve, ERROR_RETRY_DELAY))
     return refreshRadar()
@@ -55,6 +57,7 @@ export function useRadarPage() {
   }
 }
 
+/** Hook for SeaPage — auto-fetches tide data on mount with staleness detection and retry */
 export function useSeaPage() {
   const { tidesData, refreshTides, loading, errors } = useWeatherData()
 
@@ -64,13 +67,13 @@ export function useSeaPage() {
     }
   }, [tidesData.length, refreshTides])
 
-  // Error recovery with retry
+  /** Retries tide data fetch after a 30-second backoff delay */
   const retryRefreshTides = useCallback(async () => {
     await new Promise(resolve => setTimeout(resolve, ERROR_RETRY_DELAY))
     return refreshTides()
   }, [refreshTides])
 
-  // Check if data is stale (older than cache duration)
+  /** Returns true if cached tide data is older than the configured cache duration */
   const isDataStale = useCallback(() => {
     if (tidesData.length === 0) return true
     const oldestData = tidesData.reduce((oldest, current) => {
@@ -90,10 +93,26 @@ export function useSeaPage() {
 
   // Auto-refresh if data is stale
   useEffect(() => {
-    if (isDataStale() && !loading.tides) {
+    if (loading.tides) return
+    if (tidesData.length === 0) {
+      refreshTides()
+      return
+    }
+    const oldestData = tidesData.reduce((oldest, current) => {
+      const oldestTime = oldest.lastUpdated
+        ? new Date(oldest.lastUpdated).getTime()
+        : 0
+      const currentTime = current.lastUpdated
+        ? new Date(current.lastUpdated).getTime()
+        : 0
+      return oldestTime < currentTime ? oldest : current
+    })
+    if (!oldestData.lastUpdated) return
+    const dataAge = Date.now() - new Date(oldestData.lastUpdated).getTime()
+    if (dataAge > CACHE_DURATION) {
       refreshTides()
     }
-  }, [isDataStale, loading.tides, refreshTides])
+  }, [tidesData, loading.tides, refreshTides])
 
   return {
     tidesData,

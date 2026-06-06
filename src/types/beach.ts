@@ -1,3 +1,4 @@
+/** Complete beach/marine conditions for a coastal destination */
 export interface BeachConditions {
   destinationId: string
   destination: string
@@ -27,12 +28,14 @@ export interface BeachConditions {
     current: {
       height: number
       direction: number
+      directionCardinal: string
       time: string
     }
     forecast: Array<{
       time: string
       height: number
       direction: number
+      directionCardinal: string
     }>
     average24h: number
     max24h: number

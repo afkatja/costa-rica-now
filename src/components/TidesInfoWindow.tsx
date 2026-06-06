@@ -1,10 +1,11 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React from "react"
 import MapTooltipContent from "./MapTooltipContent"
 import { useSeaPage } from "../hooks/useWeatherData"
 import { Waves, Droplets } from "lucide-react"
 
+/** A coastal location with optional coordinates */
 type BeachLocation = {
   id: string
   name?: string
@@ -13,42 +14,14 @@ type BeachLocation = {
   region?: string
 }
 
-type TideExtreme = {
-  time: string
-  height: number
-  type: "high" | "low"
-}
-
-type BeachConditions = {
-  destinationId: string
-  destination: string
-  lat: number
-  lon: number
-  region: string
-  tides: {
-    extremes: TideExtreme[]
-    nextHigh: TideExtreme | null
-    nextLow: TideExtreme | null
-    currentTide: "rising" | "falling" | null
-  }
-  waves: {
-    current: { height: number; direction: number; time: string }
-    forecast: Array<{ time: string; height: number; direction: number }>
-    average24h: number
-    max24h: number
-  }
-  surfConditions: "excellent" | "good" | "fair" | "poor"
-  lastUpdated: string
-}
-
-// Get wave direction as compass bearing
+/** Converts a bearing in degrees to a cardinal compass direction */
 function getWaveDirection(degrees: number): string {
   const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
   const index = Math.round(degrees / 45) % 8
   return directions[index]
 }
 
-// Format time for display
+/** Formats an ISO timestamp to a localized time string (h:MM AM/PM) */
 function formatTime(isoString: string): string {
   const date = new Date(isoString)
   return date.toLocaleTimeString("en-US", {
@@ -58,6 +31,7 @@ function formatTime(isoString: string): string {
   })
 }
 
+/** Map info window showing tides, waves, and surf conditions for a beach */
 const TidesInfoWindow = ({ beach }: { beach: BeachLocation }) => {
   const { tidesData, loading, error } = useSeaPage()
 
@@ -145,55 +119,53 @@ const TidesInfoWindow = ({ beach }: { beach: BeachLocation }) => {
           </div>
         )}
 
-        {beachData.nextHigh && beachData.nextLow && (
-          <>
-            <div className="mb-3 pt-2 border-t">
-              <div className="flex items-center gap-2 mb-1">
-                <Droplets className="h-6 w-6 text-cyan-500" />
-                <span className="font-semibold">Tides</span>
-              </div>
-              {beachData.nextHigh && (
-                <p className="text-sm">
-                  High: <strong>{formatTime(beachData.nextHigh.time)}</strong> (
-                  {beachData.nextHigh.height.toFixed(1)}m)
-                  {beachData.currentTide === "rising" && " ⬆️"}
-                </p>
-              )}
-              {beachData.nextLow && (
-                <p className="text-sm">
-                  Low: <strong>{formatTime(beachData.nextLow.time)}</strong> (
-                  {beachData.nextLow.height.toFixed(1)}m)
-                  {beachData.currentTide === "falling" && " ⬇️"}
-                </p>
-              )}
-              {beachData.currentTide && (
-                <p className="text-xs text-gray-600 mt-1">
-                  Tide is currently {beachData.currentTide}
-                </p>
-              )}
+        <>
+          <div className="mb-3 pt-2 border-t">
+            <div className="flex items-center gap-2 mb-1">
+              <Droplets className="h-6 w-6 text-cyan-500" />
+              <span className="font-semibold">Tides</span>
             </div>
-
-            <div className="pt-2 border-t">
+            {beachData.nextHigh && (
               <p className="text-sm">
-                <span className="font-semibold">Conditions:</span>{" "}
-                <span
-                  className={`capitalize ${
-                    beachData.surfConditions === "excellent"
-                      ? "text-green-600"
-                      : beachData.surfConditions === "good"
-                        ? "text-blue-600"
-                        : beachData.surfConditions === "fair"
-                          ? "text-yellow-600"
-                          : "text-red-600"
-                  }`}
-                >
-                  {beachData.surfConditions}
-                </span>
-                {beachData.surfConditions === "excellent" && " for surfing"}
+                High: <strong>{formatTime(beachData.nextHigh.time)}</strong> (
+                {beachData.nextHigh.height.toFixed(1)}m)
+                {beachData.currentTide === "rising" && " ⬆️"}
               </p>
-            </div>
-          </>
-        )}
+            )}
+            {beachData.nextLow && (
+              <p className="text-sm">
+                Low: <strong>{formatTime(beachData.nextLow.time)}</strong> (
+                {beachData.nextLow.height.toFixed(1)}m)
+                {beachData.currentTide === "falling" && " ⬇️"}
+              </p>
+            )}
+            {beachData.currentTide && (
+              <p className="text-xs text-gray-600 mt-1">
+                Tide is currently {beachData.currentTide}
+              </p>
+            )}
+          </div>
+
+          <div className="pt-2 border-t">
+            <p className="text-sm">
+              <span className="font-semibold">Conditions:</span>{" "}
+              <span
+                className={`capitalize ${
+                  beachData.surfConditions === "excellent"
+                    ? "text-green-600"
+                    : beachData.surfConditions === "good"
+                      ? "text-blue-600"
+                      : beachData.surfConditions === "fair"
+                        ? "text-yellow-600"
+                        : "text-red-600"
+                }`}
+              >
+                {beachData.surfConditions}
+              </span>
+              {beachData.surfConditions === "excellent" && " for surfing"}
+            </p>
+          </div>
+        </>
       </div>
     </MapTooltipContent>
   )

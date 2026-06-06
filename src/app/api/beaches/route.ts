@@ -3,14 +3,16 @@ import { coastalDestinations } from "@/lib/shared/destinations"
 
 export const dynamic = "force-dynamic"
 
-// Rate limiting configuration
-const RATE_LIMIT = 60 // requests per hour
-const RATE_LIMIT_WINDOW = 60 * 60 * 1000 // 1 hour in ms
+/** Maximum requests allowed per client per hour */
+const RATE_LIMIT = 60
 
-// In-memory rate limiting store (for production, consider Redis or database)
+/** Duration of the rate limiting window in milliseconds (1 hour) */
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000
+
+/** In-memory rate limiting store keyed by client identifier (use Redis in production) */
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
 
-// Types
+/** A single high or low tide event */
 type TideExtreme = {
   time: string
   height: number
@@ -19,7 +21,7 @@ type TideExtreme = {
 
 import { BeachConditions } from "@/types/beach"
 
-// Validate API key
+/** Validates that the MAREA_API_KEY environment variable is set */
 function validateApiKey(): string {
   const apiKey = process.env.MAREA_API_KEY
   if (!apiKey) {
@@ -28,7 +30,23 @@ function validateApiKey(): string {
   return apiKey
 }
 
-// Retry logic helper
+/** Fetches a URL with an AbortController timeout — throws on timeout */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = 10000,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal })
+    return response
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** Retries an async function with exponential backoff up to maxRetries attempts */
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   maxRetries: number = 3,
@@ -48,7 +66,7 @@ async function retryWithBackoff<T>(
   throw new Error("Max retries exceeded")
 }
 
-// Better rate limiting using IP address from headers
+/** Extracts a unique client identifier from request headers for rate limiting */
 function getClientIdentifier(request: NextRequest): string {
   // Try to get real IP from various headers (common in production)
   const forwardedFor = request.headers.get("x-forwarded-for")
@@ -77,7 +95,7 @@ function getClientIdentifier(request: NextRequest): string {
     .slice(0, 32)
 }
 
-// Enhanced rate limiting helper with cleanup
+/** Checks and enforces rate limits for a given client, with periodic cleanup */
 function checkRateLimit(clientId: string): {
   allowed: boolean
   remaining: number
@@ -120,17 +138,17 @@ function checkRateLimit(clientId: string): {
   }
 }
 
-// Fetch tides from Marea API with retry logic
+/** Fetches tide extremes (high/low) from the Marea API for a given lat/lon */
 async function fetchTides(lat: number, lon: number): Promise<any> {
   let apiKey: string
   try {
     apiKey = validateApiKey()
-  } catch (error) {
+  } catch {
     throw new Error("API configuration error: Unable to validate API key")
   }
 
   return retryWithBackoff(async () => {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://api.marea.ooo/v2/tides?latitude=${lat}&longitude=${lon}`,
       {
         headers: {
@@ -152,7 +170,7 @@ async function fetchTides(lat: number, lon: number): Promise<any> {
   })
 }
 
-// Fetch detailed marine data from Open-Meteo Marine API with retry logic
+/** Fetches wave height, direction, and period from Open-Meteo Marine API */
 async function fetchMarineData(lat: number, lon: number): Promise<any> {
   return retryWithBackoff(async () => {
     const params = new URLSearchParams({
@@ -164,7 +182,7 @@ async function fetchMarineData(lat: number, lon: number): Promise<any> {
       forecast_days: "1",
     })
 
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://marine-api.open-meteo.com/v1/marine?${params}`,
     )
 
@@ -176,7 +194,7 @@ async function fetchMarineData(lat: number, lon: number): Promise<any> {
   })
 }
 
-// Process tide data to find next high/low and current trend
+/** Processes raw tide API data into next high/low extremes and current trend */
 function processTideData(tideData: any) {
   // Handle quota exceeded case
   if (tideData === "QUOTA_EXCEEDED") {
@@ -229,7 +247,7 @@ function processTideData(tideData: any) {
   }
 }
 
-// Process marine data from Open-Meteo
+/** Processes raw Open-Meteo marine data into wave forecast, current, and 24h stats */
 function processWaveData(marineData: any) {
   if (!marineData?.hourly) {
     return {
@@ -277,7 +295,7 @@ function processWaveData(marineData: any) {
   }
 }
 
-// Convert degrees to cardinal direction
+/** Converts a bearing in degrees to a 16-point cardinal compass direction */
 function degreesToCardinal(degrees: number): string {
   const directions = [
     "N",
@@ -301,7 +319,7 @@ function degreesToCardinal(degrees: number): string {
   return directions[index]
 }
 
-// Determine surf conditions based on wave height
+/** Rates surf conditions (poor to excellent) based on wave height ranges */
 function getSurfConditions(
   waveHeight: number,
 ): "excellent" | "good" | "fair" | "poor" {
@@ -313,6 +331,7 @@ function getSurfConditions(
   return "poor"
 }
 
+/** GET /api/beaches — returns tide, wave, and surf data for Costa Rica beaches. Optional ?destination= param for a single beach. */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -323,14 +342,15 @@ export async function GET(request: NextRequest) {
     const rateLimitResult = checkRateLimit(clientId)
 
     if (!rateLimitResult.allowed) {
-      const resetInMinutes = Math.ceil(
-        (rateLimitResult.resetTime - Date.now()) / (60 * 1000),
+      const resetInSeconds = Math.ceil(
+        (rateLimitResult.resetTime - Date.now()) / 1000,
       )
+      const resetInMinutes = Math.ceil(resetInSeconds / 60)
       return NextResponse.json(
         {
           error: "Rate limit exceeded",
           message: `Too many requests. Try again in ${resetInMinutes} minutes.`,
-          retryAfter: resetInMinutes * 60,
+          retryAfter: resetInSeconds,
         },
         {
           status: 429,
@@ -338,7 +358,7 @@ export async function GET(request: NextRequest) {
             "X-RateLimit-Limit": RATE_LIMIT.toString(),
             "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
             "X-RateLimit-Reset": rateLimitResult.resetTime.toString(),
-            "Retry-After": resetInMinutes.toString(),
+            "Retry-After": resetInSeconds.toString(),
           },
         },
       )
@@ -416,8 +436,7 @@ export async function GET(request: NextRequest) {
             }
 
             return conditions
-          } catch (error) {
-            // Log error but don't expose details to client
+          } catch {
             return null
           }
         }),
@@ -435,7 +454,7 @@ export async function GET(request: NextRequest) {
       },
       { headers: responseHeaders },
     )
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
