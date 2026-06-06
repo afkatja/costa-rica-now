@@ -19,7 +19,6 @@ import { useToast } from "../hooks/use-toast"
 import { WeatherAlert, WeatherDisplay } from "./WeatherDisplay"
 import { EventsAlert, EventsDisplay } from "./EventsDisplay"
 import LoadingSpinner from "./Loader"
-import { useAuth } from "../providers/auth-provider"
 import AuthDialog from "./AuthDialog"
 import { useGeolocation } from "../hooks/use-geolocation"
 
@@ -80,7 +79,6 @@ export function ChatInterface() {
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
   const [locationRequested, setLocationRequested] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { user } = useAuth()
   const { toast } = useToast()
 
   // Geolocation hook
@@ -130,11 +128,7 @@ export function ChatInterface() {
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user) {
-      setAuthDialogOpen(true)
-      return
-    }
-    if (!input.trim() || loading || !user) return
+    if (!input.trim() || loading) return
 
     const userMessage = input.trim()
     setInput("")

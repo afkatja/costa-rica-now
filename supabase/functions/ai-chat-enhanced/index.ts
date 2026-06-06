@@ -61,75 +61,80 @@ Deno.serve(
 
         console.log(`Using AI provider: ${AI_PROVIDER}`)
 
-        const userId = user!.id
+        const userId = user?.id
 
-        // Get or create conversation
+        // Get or create conversation (only for authenticated users)
         let conversation
-        if (conversationId) {
-          // Get existing conversation
-          const convResponse = await fetch(
-            `${supabaseUrl}/rest/v1/conversations?id=eq.${conversationId}&user_id=eq.${userId}`,
-            {
-              headers: {
-                Authorization: `Bearer ${serviceRoleKey}`,
-                apikey: serviceRoleKey,
+        if (userId) {
+          if (conversationId) {
+            // Get existing conversation
+            const convResponse = await fetch(
+              `${supabaseUrl}/rest/v1/conversations?id=eq.${conversationId}&user_id=eq.${userId}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${serviceRoleKey}`,
+                  apikey: serviceRoleKey,
+                },
               },
-            },
-          )
-          const conversations = await convResponse.json()
-          conversation = conversations[0]
-        }
+            )
+            const conversations = await convResponse.json()
+            conversation = conversations[0]
+          }
 
-        if (!conversation) {
-          // Create new conversation
-          const convResponse = await fetch(
-            `${supabaseUrl}/rest/v1/conversations`,
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${serviceRoleKey}`,
-                apikey: serviceRoleKey,
-                "Content-Type": "application/json",
-                Prefer: "return=representation",
+          if (!conversation) {
+            // Create new conversation
+            const convResponse = await fetch(
+              `${supabaseUrl}/rest/v1/conversations`,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${serviceRoleKey}`,
+                  apikey: serviceRoleKey,
+                  "Content-Type": "application/json",
+                  Prefer: "return=representation",
+                },
+                body: JSON.stringify({
+                  user_id: userId,
+                  title: message.substring(0, 50) + "...",
+                  context: { userPreferences },
+                }),
               },
-              body: JSON.stringify({
-                user_id: userId,
-                title: message.substring(0, 50) + "...",
-                context: { userPreferences },
-              }),
-            },
-          )
-          const newConversations = await convResponse.json()
-          conversation = newConversations[0]
-        }
+            )
+            const newConversations = await convResponse.json()
+            conversation = newConversations[0]
+          }
 
-        // Save user message
-        await fetch(`${supabaseUrl}/rest/v1/messages`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${serviceRoleKey}`,
-            apikey: serviceRoleKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            conversation_id: conversation.id,
-            role: "user",
-            content: message,
-          }),
-        })
-
-        // Get recent conversation history
-        const historyResponse = await fetch(
-          `${supabaseUrl}/rest/v1/messages?conversation_id=eq.${conversation.id}&order=created_at.desc&limit=10`,
-          {
+          // Save user message
+          await fetch(`${supabaseUrl}/rest/v1/messages`, {
+            method: "POST",
             headers: {
               Authorization: `Bearer ${serviceRoleKey}`,
               apikey: serviceRoleKey,
+              "Content-Type": "application/json",
             },
-          },
-        )
-        const history = await historyResponse.json()
-        const recentHistory = history.reverse() // Oldest first
+            body: JSON.stringify({
+              conversation_id: conversation.id,
+              role: "user",
+              content: message,
+            }),
+          })
+        }
+
+        // Get recent conversation history (only if authenticated with a conversation)
+        let recentHistory: Array<Record<string, unknown>> = []
+        if (conversation) {
+          const historyResponse = await fetch(
+            `${supabaseUrl}/rest/v1/messages?conversation_id=eq.${conversation.id}&order=created_at.desc&limit=10`,
+            {
+              headers: {
+                Authorization: `Bearer ${serviceRoleKey}`,
+                apikey: serviceRoleKey,
+              },
+            },
+          )
+          const history = await historyResponse.json()
+          recentHistory = history.reverse() // Oldest first
+        }
 
         // Fetch weather data for context
         let weatherContext = ""
@@ -366,41 +371,43 @@ Deno.serve(
           conversationHistory,
         })
 
-        // Save assistant message
-        await fetch(`${supabaseUrl}/rest/v1/messages`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${serviceRoleKey}`,
-            apikey: serviceRoleKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            conversation_id: conversation.id,
-            role: "assistant",
-            content: assistantMessage,
-            metadata: {
-              sources: relevantKnowledge.map(k => ({
-                title: k.title,
-                category: k.category,
-                location: k.location,
-              })),
-              model: modelUsed,
-              ai_provider: AI_PROVIDER,
-              search_strategy:
-                relevantKnowledge.length > 0 ? "knowledge_base" : "general",
-              weather_context: currentWeather.length > 0,
-              weather_locations: currentWeather.map(w => w.name),
-              events_context: currentEvents.length > 0,
-              events_count: currentEvents.length,
+        // Save assistant message (only for authenticated users)
+        if (conversation) {
+          await fetch(`${supabaseUrl}/rest/v1/messages`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${serviceRoleKey}`,
+              apikey: serviceRoleKey,
+              "Content-Type": "application/json",
             },
-          }),
-        })
+            body: JSON.stringify({
+              conversation_id: conversation.id,
+              role: "assistant",
+              content: assistantMessage,
+              metadata: {
+                sources: relevantKnowledge.map(k => ({
+                  title: k.title,
+                  category: k.category,
+                  location: k.location,
+                })),
+                model: modelUsed,
+                ai_provider: AI_PROVIDER,
+                search_strategy:
+                  relevantKnowledge.length > 0 ? "knowledge_base" : "general",
+                weather_context: currentWeather.length > 0,
+                weather_locations: currentWeather.map(w => w.name),
+                events_context: currentEvents.length > 0,
+                events_count: currentEvents.length,
+              },
+            }),
+          })
+        }
 
         return new Response(
           JSON.stringify({
             data: {
               message: assistantMessage,
-              conversationId: conversation.id,
+              conversationId: conversation?.id ?? null,
               sources: relevantKnowledge,
               weather: currentWeather,
               events: currentEvents.slice(0, 5), // Include top 5 events in response
@@ -435,6 +442,6 @@ Deno.serve(
         })
       }
     },
-    { requireAuth: true },
+    { requireAuth: false },
   ),
 )
