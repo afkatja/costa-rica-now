@@ -1,9 +1,9 @@
-import { Newspaper, Cloud, Mountain } from "lucide-react"
+import { Newspaper, Cloud, Mountain, Waves } from "lucide-react"
 import { createNavigation } from "next-intl/navigation"
 import { useTranslations } from "next-intl"
 import { cn } from "../lib/utils"
 
-export type PageType = "news" | "weather" | "seismic"
+export type PageType = "news" | "weather" | "seismic" | "sea"
 
 interface NavigationProps {}
 
@@ -16,6 +16,7 @@ export function Navigation({}: NavigationProps) {
     { id: "news" as const, labelKey: "news", icon: Newspaper },
     { id: "weather" as const, labelKey: "weather", icon: Cloud },
     { id: "seismic" as const, labelKey: "seismic", icon: Mountain },
+    { id: "sea" as const, labelKey: "sea", icon: Waves },
   ]
 
   return (
@@ -30,7 +31,7 @@ export function Navigation({}: NavigationProps) {
               pathname.includes(page.id)
                 ? "text-accent font-bold"
                 : "text-primary",
-              "flex items-center gap-2 hover:text-accent transition-colors"
+              "flex items-center gap-2 hover:text-accent transition-colors",
             )}
           >
             <Icon className="h-4 w-4" />

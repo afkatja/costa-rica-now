@@ -6,13 +6,15 @@
     "news": "News",
     "weather": "Weather",
     "seismic": "Seismic",
-    "home": "Home"
+    "home": "Home",
+    "sea": "Sea"
   },
   "Titles": {
     "home": "Costa Rica Now",
     "news": "News - Costa Rica Now",
     "weather": "Weather - Costa Rica Now",
-    "seismic": "Seismic Activity - Costa Rica Now"
+    "seismic": "Seismic Activity - Costa Rica Now",
+    "sea": "Sea - Costa Rica Now"
   },
   "Footer": {
     "title": "Costa Rica Now • News, Weather, Seismic and Volcanic Activity, Itineraries",
@@ -39,6 +41,8 @@
     "forecast7Days": "7-day forecast",
     "rainMaps": "Rain maps",
     "weatherAlerts": "Weather alerts",
+    "seaMap": "Sea Map",
+    "seaConditions": "Sea Conditions",
     "temperatureLegend": {
       "hot": "30°C+",
       "warm": "25-29°C",
@@ -51,11 +55,28 @@
       "active": "Active",
       "unavailable": "Unavailable",
       "updated": "Updated",
-      "coastalConditions": "Coastal Conditions",
-      "waves": "waves",
       "surf": "Surf",
       "tide": "Tide",
       "noData": "No data available for {tab} tab"
+    }
+  },
+  "SeaPage": {
+    "title": "Sea Conditions in Costa Rica",
+    "currentConditions": "Current Conditions for",
+    "lastUpdated": "Last updated",
+    "noData": "No data available",
+    "seaConditions": "Sea Conditions",
+    "refresh": "Refresh",
+    "loading": "Loading...",
+    "loadingData": "Loading data...",
+    "refreshData": "Refresh data",
+    "coastalConditions": {
+      "waveHeight": "Wave Height",
+      "waveDirection": "Wave Direction",
+      "surf": "Surf",
+      "tide": "Tide",
+      "waves": "waves",
+      "coastalConditions": "Coastal Conditions"
     }
   },
   "SeismicPage": {

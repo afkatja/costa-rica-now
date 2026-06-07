@@ -5,11 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 
 import { useTranslations } from "next-intl"
 import { useGeolocation } from "../hooks/use-geolocation"
-import {
-  useWeatherData,
-  WeatherData,
-  ForecastData,
-} from "../providers/WeatherDataProvider"
+import { useWeatherPage } from "../hooks/useWeatherData"
+import { WeatherData, ForecastData } from "../providers/WeatherDataProvider"
 import {
   Droplets,
   MapPin,
@@ -17,13 +14,11 @@ import {
   Thermometer,
   Wind,
   CloudRain,
-  Waves,
 } from "lucide-react"
 import WeatherForecast from "./WeatherForecast"
 import WeatherCurrent from "./WeatherCurrent"
 import costaRicaDestinations from "../lib/shared/destinations"
 import MapTooltipContent from "./MapTooltipContent"
-import Tides from "./Tides"
 import Radar from "./Radar"
 import GoogleMapsWrapper from "./GoogleMapsWrapper"
 import RegionalWeather, { TabOfRegional } from "./RegionalWeather"
@@ -94,10 +89,10 @@ export function WeatherPage() {
   const {
     weatherData: allWeatherData,
     forecastData: forecastFromProvider,
-    loading: providerLoading,
-    errors: providerErrors,
     refreshWeather,
-  } = useWeatherData()
+    loading: weatherLoading,
+    error: weatherError,
+  } = useWeatherPage()
 
   const {
     position,
@@ -147,14 +142,12 @@ export function WeatherPage() {
       }
 
       // Find forecast data for user location
-      if (userWeather && allWeatherData.length > 0) {
+      if (userWeather) {
         const forecastEntry = forecastFromProvider.find(
           (f: ForecastData) => f.location === userWeather.location,
         )
         setUserForecast(forecastEntry || null)
       }
-    } else {
-      refreshWeather()
     }
   }, [allWeatherData, forecastFromProvider, position, isInCostaRica])
 
@@ -191,8 +184,8 @@ export function WeatherPage() {
               (position && isInCostaRica ? "closest" : "san-jose"),
           ) || allWeatherData?.[0]
         }
-        weatherLoading={providerLoading.weather}
-        weatherError={providerErrors.weather}
+        weatherLoading={weatherLoading}
+        weatherError={weatherError}
         fetchWeatherData={refreshWeather}
         locationName={locationName}
       />
@@ -217,7 +210,7 @@ export function WeatherPage() {
             }
             className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-3 mb-4">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="weather">
                 <MapPin className="h-4 w-4 mr-2" />
                 Weather Data
@@ -225,10 +218,6 @@ export function WeatherPage() {
               <TabsTrigger value="radar">
                 <CloudRain className="h-4 w-4 mr-2" />
                 Radar
-              </TabsTrigger>
-              <TabsTrigger value="tides and waves">
-                <Waves className="h4 w-4 mr-2" />
-                Tides and waves
               </TabsTrigger>
             </TabsList>
 
@@ -246,9 +235,6 @@ export function WeatherPage() {
 
             <TabsContent value="radar" className="mt-0 space-y-4">
               <Radar />
-            </TabsContent>
-            <TabsContent value="tides and waves" className="mt-0 space-y-4">
-              <Tides />
             </TabsContent>
           </Tabs>
         </CardContent>

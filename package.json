@@ -64,7 +64,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
     "@next/bundle-analyzer": "^16.2.6",
-    "@next/eslint-plugin-next": "16.2.6",
+    "@next/eslint-plugin-next": "^16.2.7",
     "@types/google-one-tap": "^1.2.6",
     "@types/node": "^20.19.41",
     "@types/react": "^18.3.29",
@@ -72,7 +72,7 @@
     "autoprefixer": "^10.4.22",
     "cheerio": "^1.1.2",
     "eslint": "10.4.0",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "^16.2.7",
     "null-loader": "^4.0.1",
     "postcss": "^8.5.15",
     "postcss-import": "^16.1.1",

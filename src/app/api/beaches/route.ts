@@ -3,98 +3,210 @@ import { coastalDestinations } from "@/lib/shared/destinations"
 
 export const dynamic = "force-dynamic"
 
-// Types
+/** Maximum requests allowed per client per hour */
+const RATE_LIMIT = 60
+
+/** Duration of the rate limiting window in milliseconds (1 hour) */
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000
+
+/** In-memory rate limiting store keyed by client identifier (use Redis in production) */
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
+
+/** A single high or low tide event */
 type TideExtreme = {
   time: string
   height: number
   type: "high" | "low"
 }
 
-type BeachConditions = {
-  destinationId: string
-  destination: string
-  name: string
-  lat: number
-  lon: number
-  region: string
-  tides: {
-    extremes: TideExtreme[]
-    nextHigh: TideExtreme | null
-    nextLow: TideExtreme | null
-    currentTide: "rising" | "falling" | null
+import { BeachConditions } from "@/types/beach"
+
+/** Validates that the MAREA_API_KEY environment variable is set */
+function validateApiKey(): string {
+  const apiKey = process.env.MAREA_API_KEY
+  if (!apiKey) {
+    throw new Error("MAREA_API_KEY environment variable is not set")
   }
-  waves: {
-    current: {
-      height: number
-      direction: number
-      time: string
-    }
-    forecast: Array<{
-      time: string
-      height: number
-      direction: number
-    }>
-    average24h: number
-    max24h: number
-  }
-  surfConditions: "excellent" | "good" | "fair" | "poor"
-  lastUpdated: string
+  return apiKey
 }
 
-// Fetch tides from Marea API
-async function fetchTides(lat: number, lon: number) {
+/** Fetches a URL with an AbortController timeout — throws on timeout */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = 10000,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const response = await fetch(
+    const response = await fetch(url, { ...options, signal: controller.signal })
+    return response
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** Retries an async function with exponential backoff up to maxRetries attempts */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000,
+): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (error) {
+      if (attempt === maxRetries - 1) {
+        throw error
+      }
+      const delay = baseDelay * Math.pow(2, attempt)
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+  throw new Error("Max retries exceeded")
+}
+
+/** Extracts a unique client identifier from request headers for rate limiting */
+function getClientIdentifier(request: NextRequest): string {
+  // Try to get real IP from various headers (common in production)
+  const forwardedFor = request.headers.get("x-forwarded-for")
+  const realIp = request.headers.get("x-real-ip")
+  const cfConnectingIp = request.headers.get("cf-connecting-ip") // Cloudflare
+
+  if (forwardedFor) {
+    // x-forwarded-for can contain multiple IPs, take the first one
+    return forwardedFor.split(",")[0].trim()
+  }
+  if (realIp) {
+    return realIp
+  }
+  if (cfConnectingIp) {
+    return cfConnectingIp
+  }
+
+  // Fallback to a combination of headers for better uniqueness
+  const userAgent = request.headers.get("user-agent") || "unknown"
+  const accept = request.headers.get("accept") || "unknown"
+  const acceptLang = request.headers.get("accept-language") || "unknown"
+
+  // Create a hash from headers for better identification
+  return Buffer.from(`${userAgent}:${accept}:${acceptLang}`)
+    .toString("base64")
+    .slice(0, 32)
+}
+
+/** Checks and enforces rate limits for a given client, with periodic cleanup */
+function checkRateLimit(clientId: string): {
+  allowed: boolean
+  remaining: number
+  resetTime: number
+} {
+  const now = Date.now()
+  const clientData = rateLimitStore.get(clientId)
+
+  // Clean up expired entries periodically
+  if (Math.random() < 0.01) {
+    // 1% chance to cleanup
+    for (const [key, data] of rateLimitStore.entries()) {
+      if (now > data.resetTime) {
+        rateLimitStore.delete(key)
+      }
+    }
+  }
+
+  if (!clientData || now > clientData.resetTime) {
+    rateLimitStore.set(clientId, {
+      count: 1,
+      resetTime: now + RATE_LIMIT_WINDOW,
+    })
+    return {
+      allowed: true,
+      remaining: RATE_LIMIT - 1,
+      resetTime: now + RATE_LIMIT_WINDOW,
+    }
+  }
+
+  if (clientData.count >= RATE_LIMIT) {
+    return { allowed: false, remaining: 0, resetTime: clientData.resetTime }
+  }
+
+  clientData.count++
+  return {
+    allowed: true,
+    remaining: RATE_LIMIT - clientData.count,
+    resetTime: clientData.resetTime,
+  }
+}
+
+/** Fetches tide extremes (high/low) from the Marea API for a given lat/lon */
+async function fetchTides(lat: number, lon: number): Promise<any> {
+  let apiKey: string
+  try {
+    apiKey = validateApiKey()
+  } catch {
+    throw new Error("API configuration error: Unable to validate API key")
+  }
+
+  return retryWithBackoff(async () => {
+    const response = await fetchWithTimeout(
       `https://api.marea.ooo/v2/tides?latitude=${lat}&longitude=${lon}`,
       {
         headers: {
-          "x-marea-api-token": process.env.MAREA_API_KEY!,
+          "x-marea-api-token": apiKey,
         },
       },
     )
 
     if (!response.ok) {
-      console.error(`Marea API error: ${response.status}`)
-      return null
+      if (response.status === 403) {
+        return "QUOTA_EXCEEDED"
+      }
+      throw new Error(
+        `Marea API error: ${response.status} ${response.statusText}`,
+      )
     }
 
-    const data = await response.json()
-    return data
-  } catch (error) {
-    console.error("Error fetching tides:", error)
-    return null
-  }
+    return await response.json()
+  })
 }
 
-// Fetch waves from Open-Meteo Marine API
-async function fetchWaves(lat: number, lon: number) {
-  try {
+/** Fetches wave height, direction, and period from Open-Meteo Marine API */
+async function fetchMarineData(lat: number, lon: number): Promise<any> {
+  return retryWithBackoff(async () => {
     const params = new URLSearchParams({
       latitude: lat.toString(),
       longitude: lon.toString(),
+      current:
+        "wave_height,wave_direction,wave_period,wave_peak_period,wind_wave_height,wind_wave_direction,wind_wave_period,wind_wave_peak_period,swell_wave_height,swell_wave_direction,swell_wave_period,swell_wave_peak_period,sea_level_height_msl,ocean_current_velocity,ocean_current_direction",
       hourly: "wave_height,wave_direction,wave_period",
-      forecast_days: "2",
+      forecast_days: "1",
     })
 
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://marine-api.open-meteo.com/v1/marine?${params}`,
     )
 
     if (!response.ok) {
-      console.error(`Open-Meteo API error: ${response.status}`)
-      return null
+      throw new Error(`Open-Meteo Marine API error: ${response.status}`)
     }
 
-    const data = await response.json()
-    return data
-  } catch (error) {
-    console.error("Error fetching waves:", error)
-    return null
-  }
+    return await response.json()
+  })
 }
 
-// Process tide data to find next high/low and current trend
+/** Processes raw tide API data into next high/low extremes and current trend */
 function processTideData(tideData: any) {
+  // Handle quota exceeded case
+  if (tideData === "QUOTA_EXCEEDED") {
+    console.log("Skipping tide processing due to quota exceeded")
+    return {
+      extremes: [],
+      nextHigh: null,
+      nextLow: null,
+      currentTide: null,
+    }
+  }
+
   if (!tideData?.extremes) {
     return {
       extremes: [],
@@ -108,7 +220,7 @@ function processTideData(tideData: any) {
   const extremes: TideExtreme[] = tideData.extremes.map((e: any) => ({
     time: e.datetime,
     height: e.height,
-    type: e.type === "HIGH" ? "high" : "low",
+    type: e.state === "HIGH TIDE" ? "high" : "low",
   }))
 
   // Find next high and low
@@ -116,10 +228,15 @@ function processTideData(tideData: any) {
   const nextHigh = futureExtremes.find(e => e.type === "high") || null
   const nextLow = futureExtremes.find(e => e.type === "low") || null
 
-  // Determine if tide is rising or falling
+  // Determine current tide state from heights data
   let currentTide: "rising" | "falling" | null = null
-  if (futureExtremes.length > 0) {
-    currentTide = futureExtremes[0].type === "high" ? "rising" : "falling"
+  if (tideData.heights && tideData.heights.length > 0) {
+    const currentHeight = tideData.heights[0]
+    if (currentHeight.state === "RISING") {
+      currentTide = "rising"
+    } else if (currentHeight.state === "FALLING") {
+      currentTide = "falling"
+    }
   }
 
   return {
@@ -130,30 +247,32 @@ function processTideData(tideData: any) {
   }
 }
 
-// Process wave data
-function processWaveData(waveData: any) {
-  if (!waveData?.hourly) {
+/** Processes raw Open-Meteo marine data into wave forecast, current, and 24h stats */
+function processWaveData(marineData: any) {
+  if (!marineData?.hourly) {
     return {
-      current: { height: 0, direction: 0, time: new Date().toISOString() },
+      current: { height: 0, direction: 0, directionCardinal: "N", time: new Date().toISOString() },
       forecast: [],
       average24h: 0,
       max24h: 0,
     }
   }
 
-  const { time, wave_height, wave_direction } = waveData.hourly
+  const { time, wave_height, wave_direction } = marineData.hourly
 
   // Create forecast array
   const forecast = time.slice(0, 48).map((t: string, i: number) => ({
     time: t,
     height: wave_height[i] || 0,
     direction: wave_direction[i] || 0,
+    directionCardinal: degreesToCardinal(wave_direction[i] || 0),
   }))
 
   // Current conditions (first data point)
   const current = {
     height: wave_height[0] || 0,
     direction: wave_direction[0] || 0,
+    directionCardinal: degreesToCardinal(wave_direction[0] || 0),
     time: time[0],
   }
 
@@ -176,7 +295,31 @@ function processWaveData(waveData: any) {
   }
 }
 
-// Determine surf conditions based on wave height
+/** Converts a bearing in degrees to a 16-point cardinal compass direction */
+function degreesToCardinal(degrees: number): string {
+  const directions = [
+    "N",
+    "NNE",
+    "NE",
+    "ENE",
+    "E",
+    "ESE",
+    "SE",
+    "SSE",
+    "S",
+    "SSW",
+    "SW",
+    "WSW",
+    "W",
+    "WNW",
+    "NW",
+    "NNW",
+  ]
+  const index = Math.round(degrees / 22.5) % 16
+  return directions[index]
+}
+
+/** Rates surf conditions (poor to excellent) based on wave height ranges */
 function getSurfConditions(
   waveHeight: number,
 ): "excellent" | "good" | "fair" | "poor" {
@@ -188,12 +331,45 @@ function getSurfConditions(
   return "poor"
 }
 
+/** GET /api/beaches — returns tide, wave, and surf data for Costa Rica beaches. Optional ?destination= param for a single beach. */
 export async function GET(request: NextRequest) {
   try {
-    console.log("Request URL:", request.url)
-    console.log("Request method:", request.method)
     const { searchParams } = new URL(request.url)
     const destinationId = searchParams.get("destination")
+
+    // Enhanced rate limiting using client identifier
+    const clientId = getClientIdentifier(request)
+    const rateLimitResult = checkRateLimit(clientId)
+
+    if (!rateLimitResult.allowed) {
+      const resetInSeconds = Math.ceil(
+        (rateLimitResult.resetTime - Date.now()) / 1000,
+      )
+      const resetInMinutes = Math.ceil(resetInSeconds / 60)
+      return NextResponse.json(
+        {
+          error: "Rate limit exceeded",
+          message: `Too many requests. Try again in ${resetInMinutes} minutes.`,
+          retryAfter: resetInSeconds,
+        },
+        {
+          status: 429,
+          headers: {
+            "X-RateLimit-Limit": RATE_LIMIT.toString(),
+            "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
+            "X-RateLimit-Reset": rateLimitResult.resetTime.toString(),
+            "Retry-After": resetInSeconds.toString(),
+          },
+        },
+      )
+    }
+
+    // Add rate limit headers to successful responses
+    const responseHeaders = {
+      "X-RateLimit-Limit": RATE_LIMIT.toString(),
+      "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
+      "X-RateLimit-Reset": rateLimitResult.resetTime.toString(),
+    }
 
     // If specific destination requested
     if (destinationId) {
@@ -205,14 +381,14 @@ export async function GET(request: NextRequest) {
         )
       }
 
-      const [tideData, waveData] = await Promise.all([
+      const [tideData, marineData] = await Promise.all([
         fetchTides(destination.lat, destination.lon),
-        fetchWaves(destination.lat, destination.lon),
+        fetchMarineData(destination.lat, destination.lon),
       ])
 
       const tides = processTideData(tideData)
 
-      const waves = processWaveData(waveData)
+      const waves = processWaveData(marineData)
 
       const conditions: BeachConditions = {
         destinationId: destination.id,
@@ -227,7 +403,7 @@ export async function GET(request: NextRequest) {
         lastUpdated: new Date().toISOString(),
       }
 
-      return NextResponse.json(conditions)
+      return NextResponse.json(conditions, { headers: responseHeaders })
     }
     // Process destinations in batches to avoid overwhelming external APIs
     const BATCH_SIZE = 5
@@ -238,13 +414,13 @@ export async function GET(request: NextRequest) {
       const batchResults = await Promise.all(
         batch.map(async destination => {
           try {
-            const [tideData, waveData] = await Promise.all([
+            const [tideData, marineData] = await Promise.all([
               fetchTides(destination.lat, destination.lon),
-              fetchWaves(destination.lat, destination.lon),
+              fetchMarineData(destination.lat, destination.lon),
             ])
 
             const tides = processTideData(tideData)
-            const waves = processWaveData(waveData)
+            const waves = processWaveData(marineData)
 
             const conditions: BeachConditions = {
               destinationId: destination.id,
@@ -260,8 +436,7 @@ export async function GET(request: NextRequest) {
             }
 
             return conditions
-          } catch (error) {
-            console.error(`Error fetching data for ${destination.name}:`, error)
+          } catch {
             return null
           }
         }),
@@ -272,14 +447,16 @@ export async function GET(request: NextRequest) {
     // Filter out any failed requests
     const validConditions = allConditions.filter(Boolean)
 
-    return NextResponse.json({
-      destinations: validConditions,
-      count: validConditions.length,
-    })
-  } catch (error: any) {
-    console.error("Error in beach conditions API:", error)
     return NextResponse.json(
-      { error: "Internal server error", details: error.message },
+      {
+        destinations: validConditions,
+        count: validConditions.length,
+      },
+      { headers: responseHeaders },
+    )
+  } catch {
+    return NextResponse.json(
+      { error: "Internal server error" },
       { status: 500 },
     )
   }

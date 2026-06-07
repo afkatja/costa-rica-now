@@ -1,9 +1,11 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
-import Image from "next/image"
+import React from "react"
 import MapTooltipContent from "./MapTooltipContent"
+import { useSeaPage } from "../hooks/useWeatherData"
+import { Waves, Droplets } from "lucide-react"
 
+/** A coastal location with optional coordinates */
 type BeachLocation = {
   id: string
   name?: string
@@ -12,42 +14,14 @@ type BeachLocation = {
   region?: string
 }
 
-type TideExtreme = {
-  time: string
-  height: number
-  type: "high" | "low"
-}
-
-type BeachConditions = {
-  destinationId: string
-  destination: string
-  lat: number
-  lon: number
-  region: string
-  tides: {
-    extremes: TideExtreme[]
-    nextHigh: TideExtreme | null
-    nextLow: TideExtreme | null
-    currentTide: "rising" | "falling" | null
-  }
-  waves: {
-    current: { height: number; direction: number; time: string }
-    forecast: Array<{ time: string; height: number; direction: number }>
-    average24h: number
-    max24h: number
-  }
-  surfConditions: "excellent" | "good" | "fair" | "poor"
-  lastUpdated: string
-}
-
-// Get wave direction as compass bearing
+/** Converts a bearing in degrees to a cardinal compass direction */
 function getWaveDirection(degrees: number): string {
   const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
   const index = Math.round(degrees / 45) % 8
   return directions[index]
 }
 
-// Format time for display
+/** Formats an ISO timestamp to a localized time string (h:MM AM/PM) */
 function formatTime(isoString: string): string {
   const date = new Date(isoString)
   return date.toLocaleTimeString("en-US", {
@@ -57,40 +31,12 @@ function formatTime(isoString: string): string {
   })
 }
 
+/** Map info window showing tides, waves, and surf conditions for a beach */
 const TidesInfoWindow = ({ beach }: { beach: BeachLocation }) => {
-  const [data, setData] = useState<BeachConditions | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
-  const [error, setError] = useState<string | null>(null)
+  const { tidesData, loading, error } = useSeaPage()
 
-  useEffect(() => {
-    let mounted = true
-    async function fetchForBeach() {
-      setLoading(true)
-      setError(null)
-      try {
-        const res = await fetch(
-          `/api/beaches?destination=${encodeURIComponent(beach.id)}`
-        )
-        if (!res.ok) {
-          throw new Error(`API error ${res.status}`)
-        }
-        const json = await res.json()
-        if (!mounted) return
-        setData(json)
-      } catch (err: any) {
-        if (!mounted) return
-        console.error("Error loading beach conditions:", err)
-        setError(err.message || "Failed to load")
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    }
-
-    fetchForBeach()
-    return () => {
-      mounted = false
-    }
-  }, [beach.id])
+  // Find the specific beach data from the provider
+  const beachData = tidesData.find(tide => tide.location === beach.id)
 
   if (loading) {
     return (
@@ -100,12 +46,21 @@ const TidesInfoWindow = ({ beach }: { beach: BeachLocation }) => {
           description: "Loading tides and waves...",
         }}
       >
-        <div className="p-2">Loading...</div>
+        <div className="p-4 space-y-3">
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+          </div>
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+          </div>
+        </div>
       </MapTooltipContent>
     )
   }
 
-  if (error || !data) {
+  if (error || !beachData) {
     return (
       <MapTooltipContent
         data={{
@@ -113,38 +68,43 @@ const TidesInfoWindow = ({ beach }: { beach: BeachLocation }) => {
           description: "Tides and waves",
         }}
       >
-        <div className="p-2 text-sm text-red-600">
-          {error ? `Error: ${error}` : "No data available"}
+        <div className="p-4">
+          <div className="flex items-center gap-2 text-sm text-amber-600">
+            <Droplets className="h-4 w-4" />
+            <span>
+              {error
+                ? "Unable to load marine data. Please try again later."
+                : "No marine data available for this location."}
+            </span>
+          </div>
         </div>
       </MapTooltipContent>
     )
   }
 
-  const waveDir = getWaveDirection(data.waves.current.direction)
-  const nextForecast = data.waves.forecast.slice(1, 4)
+  const waveDir =
+    beachData.waveDirectionCardinal ||
+    getWaveDirection(beachData.waveDirection || 0)
+
+  const nextForecast = beachData.waveForecast?.slice(1, 7) || []
 
   return (
     <MapTooltipContent
       data={{
-        icon: "https://static.vecteezy.com/system/resources/previews/059/837/606/non_2x/ocean-waves-icon-water-symbol-sea-waves-wave-water-ripple-line-vector.jpg",
-        description: `Region: ${data.region}`,
+        icon: "https://openweathermap.org/img/wn/03d@2x.png", // Scattered clouds icon for marine conditions
+        description: `Region: ${beachData.region}`,
       }}
     >
       <div className="p-2 max-w-xs">
-        {data.waves && (
+        {beachData.waveHeight && (
           <div className="mb-3">
             <div className="flex items-center gap-2 mb-1">
-              <Image
-                src="https://static.vecteezy.com/system/resources/previews/059/838/535/non_2x/ocean-waves-icon-water-symbol-graphic-sea-waves-wave-water-ripple-flow-water-splash-shape-vector.jpg"
-                alt="Waves"
-                width={40}
-                height={40}
-              />
+              <Waves className="h-8 w-8 text-blue-500" />
               <span className="font-semibold">Waves</span>
             </div>
             <p className="text-sm">
-              <strong>{data.waves.current.height.toFixed(1)}m</strong> @{" "}
-              {data.waves.current.direction}° {waveDir}
+              <strong>{beachData.waveHeight.toFixed(1)}m</strong> @{" "}
+              {beachData.waveDirection}° {waveDir}
             </p>
             {nextForecast.length > 0 && (
               <p className="text-xs text-gray-600 mt-1">
@@ -153,65 +113,59 @@ const TidesInfoWindow = ({ beach }: { beach: BeachLocation }) => {
               </p>
             )}
             <p className="text-xs text-gray-600">
-              24h avg: {data.waves.average24h}m | max: {data.waves.max24h}m
+              24h avg: {beachData.waveAverage24h}m | max: {beachData.waveMax24h}
+              m
             </p>
           </div>
         )}
 
-        {!!data.tides.extremes.length && (
-          <>
-            <div className="mb-3 pt-2 border-t">
-              <div className="flex items-center gap-2 mb-1">
-                <Image
-                  src="https://static.vecteezy.com/system/resources/previews/036/666/679/non_2x/wave-free-vector.png"
-                  alt="Tides"
-                  width={30}
-                  height={30}
-                />
-                <span className="font-semibold">Tides</span>
-              </div>
-              {data.tides.nextHigh && (
-                <p className="text-sm">
-                  High: <strong>{formatTime(data.tides.nextHigh.time)}</strong>{" "}
-                  ({data.tides.nextHigh.height.toFixed(1)}m)
-                  {data.tides.currentTide === "rising" && " ⬆️"}
-                </p>
-              )}
-              {data.tides.nextLow && (
-                <p className="text-sm">
-                  Low: <strong>{formatTime(data.tides.nextLow.time)}</strong> (
-                  {data.tides.nextLow.height.toFixed(1)}m)
-                  {data.tides.currentTide === "falling" && " ⬇️"}
-                </p>
-              )}
-              {data.tides.currentTide && (
-                <p className="text-xs text-gray-600 mt-1">
-                  Tide is currently {data.tides.currentTide}
-                </p>
-              )}
+        <>
+          <div className="mb-3 pt-2 border-t">
+            <div className="flex items-center gap-2 mb-1">
+              <Droplets className="h-6 w-6 text-cyan-500" />
+              <span className="font-semibold">Tides</span>
             </div>
-
-            <div className="pt-2 border-t">
+            {beachData.nextHigh && (
               <p className="text-sm">
-                <span className="font-semibold">Conditions:</span>{" "}
-                <span
-                  className={`capitalize ${
-                    data.surfConditions === "excellent"
-                      ? "text-green-600"
-                      : data.surfConditions === "good"
-                      ? "text-blue-600"
-                      : data.surfConditions === "fair"
-                      ? "text-yellow-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {data.surfConditions}
-                </span>
-                {data.surfConditions === "excellent" && " for surfing"}
+                High: <strong>{formatTime(beachData.nextHigh.time)}</strong> (
+                {beachData.nextHigh.height.toFixed(1)}m)
+                {beachData.currentTide === "rising" && " ⬆️"}
               </p>
-            </div>
-          </>
-        )}
+            )}
+            {beachData.nextLow && (
+              <p className="text-sm">
+                Low: <strong>{formatTime(beachData.nextLow.time)}</strong> (
+                {beachData.nextLow.height.toFixed(1)}m)
+                {beachData.currentTide === "falling" && " ⬇️"}
+              </p>
+            )}
+            {beachData.currentTide && (
+              <p className="text-xs text-gray-600 mt-1">
+                Tide is currently {beachData.currentTide}
+              </p>
+            )}
+          </div>
+
+          <div className="pt-2 border-t">
+            <p className="text-sm">
+              <span className="font-semibold">Conditions:</span>{" "}
+              <span
+                className={`capitalize ${
+                  beachData.surfConditions === "excellent"
+                    ? "text-green-600"
+                    : beachData.surfConditions === "good"
+                      ? "text-blue-600"
+                      : beachData.surfConditions === "fair"
+                        ? "text-yellow-600"
+                        : "text-red-600"
+                }`}
+              >
+                {beachData.surfConditions}
+              </span>
+              {beachData.surfConditions === "excellent" && " for surfing"}
+            </p>
+          </div>
+        </>
       </div>
     </MapTooltipContent>
   )

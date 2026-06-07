@@ -19,17 +19,22 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   // Determine current page based on pathname
   const getCurrentPage = () => {
     const path = pathname.split("/").pop() || ""
-
-    if (path === "" || path === "en" || path === "es") {
-      return "home"
-    } else if (path === "news") {
-      return "news"
-    } else if (path === "weather") {
-      return "weather"
-    } else if (path === "seismic") {
-      return "seismic"
+    switch (path) {
+      case "":
+      case "en":
+      case "es":
+        return "home"
+      case "news":
+        return "news"
+      case "weather":
+        return "weather"
+      case "seismic":
+        return "seismic"
+      case "sea":
+        return "sea"
+      default:
+        return "home"
     }
-    return "home"
   }
 
   const currentPage = getCurrentPage()
@@ -39,7 +44,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     <>
       <Header title={title} />
       <div className="min-h-[calc(100dvh-65px-90px)] bg-background flex flex-col">
-        <main className="container mx-auto px-4 py-6 flex-1 flex flex-col">{children}</main>
+        <main className="container mx-auto px-4 py-6 flex-1 flex flex-col">
+          {children}
+        </main>
       </div>
       {/* Footer */}
       <footer className="border-t bg-muted/50 py-6">

@@ -4,18 +4,17 @@ import { useTranslations } from "next-intl"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import costaRicaDestinations from "../lib/shared/destinations"
 import { useWeatherData } from "../providers/WeatherDataProvider"
-import { CloudRain, Droplets, Waves } from "lucide-react"
+import { CloudRain, Droplets } from "lucide-react"
 
 export enum TabOfRegional {
   Weather = "weather",
   Radar = "radar",
-  TidesAndWaves = "tides and waves",
 }
 
 const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
   const t = useTranslations("WeatherPage")
 
-  const { weatherData: allWeatherData, radarData, tidesData } = useWeatherData()
+  const { weatherData: allWeatherData, radarData } = useWeatherData()
   const getRegionalWeather = () => {
     const regionMap = new Map<
       string,
@@ -64,16 +63,6 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
             type: "radar" as const,
           }))
 
-      case TabOfRegional.TidesAndWaves:
-        return tidesData
-          .filter((tide: any) => tide.available)
-          .map((tide: any) => ({
-            name: tide.name,
-            region: tide.region,
-            data: tide,
-            type: "tides" as const,
-          }))
-
       default:
         return []
     }
@@ -87,8 +76,8 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
         return t("currentConditions")
       case TabOfRegional.Radar:
         return t("precipitation")
-      case TabOfRegional.TidesAndWaves:
-        return t("coastalConditions")
+      default:
+        return ""
     }
   }
   return (
@@ -146,33 +135,6 @@ const RegionalWeather = ({ activeTab }: { activeTab: TabOfRegional }) => {
                       <p className="text-xs text-muted-foreground">
                         {t("regionalWeather.updated")}:{" "}
                         {new Date(item.data.lastUpdated).toLocaleTimeString()}
-                      </p>
-                    )}
-                  </>
-                )}
-
-                {item.type === "tides" && (
-                  <>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Waves className="h-5 w-5 text-blue-500" />
-                      <p className="text-sm font-medium">
-                        {t("regionalWeather.coastalConditions")}
-                      </p>
-                    </div>
-                    {item.data.waveHeight && (
-                      <p className="text-lg font-medium mb-1">
-                        {item.data.waveHeight.toFixed(1)}m{" "}
-                        {t("regionalWeather.waves")}
-                      </p>
-                    )}
-                    {item.data.surfConditions && (
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {t("regionalWeather.surf")}: {item.data.surfConditions}
-                      </p>
-                    )}
-                    {item.data.currentTide && (
-                      <p className="text-xs text-muted-foreground">
-                        {t("regionalWeather.tide")}: {item.data.currentTide}
                       </p>
                     )}
                   </>
