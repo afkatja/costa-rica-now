@@ -19,6 +19,15 @@ const nextConfig = {
 
   images: {
     qualities: [50, 75, 100],
+    localPatterns: [
+      {
+        pathname: "/api/image-proxy/**",
+        search: "*",
+      },
+      {
+        pathname: "/**",
+      },
+    ],
     remotePatterns: [
       {
         protocol: "https",
@@ -50,6 +59,7 @@ const nextConfig = {
         hostname: "**.wikimedia.org",
         port: "",
       },
+
     ],
   },
   async rewrites() {
