@@ -1,6 +1,7 @@
 import { COSTA_RICA_VOLCANOES, VOLCANO_COORDINATES } from "../_shared/coords.ts"
 import { corsHeaders } from "../_shared/cors.ts"
 import { withEdgeHandler } from "../_shared/edge-handler.ts"
+import { redisGet, redisSet } from "../_shared/redis-cache.ts"
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.56/deno-dom-wasm.ts"
 
 declare const Deno: any
@@ -281,6 +282,17 @@ Deno.serve(
         )
       }
 
+      // Check cache for volcano data
+      const cacheKey = `volcanic:${timeCode || 'all'}`
+      const cached = await redisGet<any>(cacheKey)
+      if (cached) {
+        console.log(`[volcanic] Cache hit for ${cacheKey}`)
+        return new Response(JSON.stringify(cached), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "HIT" },
+        })
+      }
+
       // Scrape volcano data for all Costa Rica volcanoes
       const volcanoPromises = Object.entries(COSTA_RICA_VOLCANOES).map(
         ([name, id]) => scrapeVolcanoData(id, name),
@@ -349,6 +361,9 @@ Deno.serve(
           count: enhancedVolcanoes.length,
         },
       }
+
+      // Cache volcano data for 1 hour (data is relatively static)
+      await redisSet(cacheKey, response, 3600)
 
       return new Response(JSON.stringify(response), {
         status: 200,

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { coastalDestinations } from "@/lib/shared/destinations"
-
-export const dynamic = "force-dynamic"
+import { redisGet, redisSet } from "@/lib/redis-cache"
 
 /** Maximum requests allowed per client per hour */
 const RATE_LIMIT = 60
@@ -381,6 +380,15 @@ export async function GET(request: NextRequest) {
         )
       }
 
+      // Check cache for destination data
+      const destCacheKey = `beaches:${destinationId}`
+      const cachedConditions = await redisGet<BeachConditions>(destCacheKey)
+      if (cachedConditions) {
+        return NextResponse.json(cachedConditions, {
+          headers: { ...responseHeaders, "X-Cache": "HIT" },
+        })
+      }
+
       const [tideData, marineData] = await Promise.all([
         fetchTides(destination.lat, destination.lon),
         fetchMarineData(destination.lat, destination.lon),
@@ -403,8 +411,19 @@ export async function GET(request: NextRequest) {
         lastUpdated: new Date().toISOString(),
       }
 
+      await redisSet(destCacheKey, conditions, 1800)
+
       return NextResponse.json(conditions, { headers: responseHeaders })
     }
+    // Check cache for all-destinations response
+    const allCacheKey = `beaches:all`
+    const cachedAll = await redisGet<any>(allCacheKey)
+    if (cachedAll) {
+      return NextResponse.json(cachedAll, {
+        headers: { ...responseHeaders, "X-Cache": "HIT" },
+      })
+    }
+
     // Process destinations in batches to avoid overwhelming external APIs
     const BATCH_SIZE = 5
     const allConditions: (BeachConditions | null)[] = []
@@ -435,6 +454,9 @@ export async function GET(request: NextRequest) {
               lastUpdated: new Date().toISOString(),
             }
 
+            // Cache individual destinations as they are fetched
+            await redisSet(`beaches:${destination.id}`, conditions, 1800)
+
             return conditions
           } catch {
             return null
@@ -447,13 +469,15 @@ export async function GET(request: NextRequest) {
     // Filter out any failed requests
     const validConditions = allConditions.filter(Boolean)
 
-    return NextResponse.json(
-      {
-        destinations: validConditions,
-        count: validConditions.length,
-      },
-      { headers: responseHeaders },
-    )
+    const allResponse = {
+      destinations: validConditions,
+      count: validConditions.length,
+    }
+
+    // Cache the full response for 30 minutes
+    await redisSet(allCacheKey, allResponse, 1800)
+
+    return NextResponse.json(allResponse, { headers: responseHeaders })
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },
@@ -462,5 +486,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Optional: Add caching middleware or use Next.js route segment config
-export const revalidate = 3600 // Revalidate every hour (tides are predictable)
+// Tides are predictable — cache is handled via Redis in src/lib/redis-cache.ts

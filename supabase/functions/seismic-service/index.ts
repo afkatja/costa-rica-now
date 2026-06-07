@@ -1,6 +1,7 @@
 import { COSTA_RICA_BOUNDS } from "../_shared/coords.ts"
 import { corsHeaders } from "../_shared/cors.ts"
 import { withEdgeHandler } from "../_shared/edge-handler.ts"
+import { redisGet, redisSet } from "../_shared/redis-cache.ts"
 
 // Import new modules
 import {
@@ -443,6 +444,17 @@ Deno.serve(
         )
       }
 
+      // Check cache for identical request params (5 min TTL)
+      const cacheKey = `seismic:${JSON.stringify(params)}`
+      const cached = await redisGet<any>(cacheKey)
+      if (cached) {
+        console.log(`[seismic] Cache hit for ${cacheKey}`)
+        return new Response(JSON.stringify(cached), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "HIT" },
+        })
+      }
+
       // Adjust date range when filters are present
       let adjustedParams = { ...params }
       const hasFilters =
@@ -690,46 +702,48 @@ Deno.serve(
         feltCount: sortedEvents.filter(e => e.felt && e.felt > 0).length,
       }
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          events: paginatedEvents,
-          metadata: {
-            type,
-            requestedAt: new Date().toISOString(),
-            region: "Costa Rica",
-            dateRange: {
-              start: params.startDate,
-              end: params.endDate,
-              adjustedStart: hasFilters ? adjustedParams.startDate : undefined,
-            },
-            pagination: {
-              total: sortedEvents.length,
-              limit,
-              offset,
-              hasMore: offset + limit < sortedEvents.length,
-            },
-            stats,
-            sources: {
-              usgs: usgsEvents.status === "fulfilled" ? "success" : "failed",
-              ovsicori:
-                ovsicoriEvents.status === "fulfilled" ? "partial" : "failed",
-              rsn: rsnEvents.status === "fulfilled" ? "success" : "failed",
-            },
-            notes: [
-              "USGS includes earthquakes M2.5+ in Costa Rica region",
-              "OVSICORI includes recent earthquakes from the public table feed",
-              "When filters are applied, data from previous month is fetched for better filtering options",
-              "When specific source is requested, all events from that source are returned without deduplication",
-              "Duplicates across sources are automatically removed based on time/location proximity when no source filter is applied",
-            ],
+      const responseBody = {
+        success: true,
+        events: paginatedEvents,
+        metadata: {
+          type,
+          requestedAt: new Date().toISOString(),
+          region: "Costa Rica",
+          dateRange: {
+            start: params.startDate,
+            end: params.endDate,
+            adjustedStart: hasFilters ? adjustedParams.startDate : undefined,
           },
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          pagination: {
+            total: sortedEvents.length,
+            limit,
+            offset,
+            hasMore: offset + limit < sortedEvents.length,
+          },
+          stats,
+          sources: {
+            usgs: usgsEvents.status === "fulfilled" ? "success" : "failed",
+            ovsicori:
+              ovsicoriEvents.status === "fulfilled" ? "partial" : "failed",
+            rsn: rsnEvents.status === "fulfilled" ? "success" : "failed",
+          },
+          notes: [
+            "USGS includes earthquakes M2.5+ in Costa Rica region",
+            "OVSICORI includes recent earthquakes from the public table feed",
+            "When filters are applied, data from previous month is fetched for better filtering options",
+            "When specific source is requested, all events from that source are returned without deduplication",
+            "Duplicates across sources are automatically removed based on time/location proximity when no source filter is applied",
+          ],
         },
-      )
+      }
+
+      // Cache the response for 5 minutes
+      await redisSet(cacheKey, responseBody, 300)
+
+      return new Response(JSON.stringify(responseBody), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
     } catch (error) {
       console.error("Service error:", error)
 

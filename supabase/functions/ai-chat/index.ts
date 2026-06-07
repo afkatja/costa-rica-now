@@ -1,3 +1,5 @@
+import { redisGet, redisSet } from "../_shared/redis-cache.ts"
+
 Deno.serve(async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -51,7 +53,6 @@ Deno.serve(async (req) => {
     // Get or create conversation
     let conversation;
     if (conversationId) {
-      // Get existing conversation
       const convResponse = await fetch(
         `${supabaseUrl}/rest/v1/conversations?id=eq.${conversationId}&user_id=eq.${userId}`,
         {
@@ -66,7 +67,6 @@ Deno.serve(async (req) => {
     }
 
     if (!conversation) {
-      // Create new conversation
       const convResponse = await fetch(`${supabaseUrl}/rest/v1/conversations`, {
         method: 'POST',
         headers: {
@@ -111,25 +111,34 @@ Deno.serve(async (req) => {
       }
     );
     const history = await historyResponse.json();
-    const recentHistory = history.reverse(); // Oldest first
+    const recentHistory = history.reverse();
 
-    // Search knowledge base using text search (fallback for quota issues)
-    const searchResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/text_search_documents`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${serviceRoleKey}`,
-        'apikey': serviceRoleKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        query_text: message,
-        match_count: 5
-      })
-    });
-
+    // Search knowledge base with Redis caching
     let relevantKnowledge = [];
-    if (searchResponse.ok) {
-      relevantKnowledge = await searchResponse.json();
+    const searchCacheKey = `kb:${message.toLowerCase().slice(0, 100)}`
+    const cachedKnowledge = await redisGet<any[]>(searchCacheKey)
+    if (cachedKnowledge) {
+      console.log(`[ai-chat] Knowledge base cache hit for query`)
+      relevantKnowledge = cachedKnowledge
+    } else {
+      const searchResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/text_search_documents`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${serviceRoleKey}`,
+          'apikey': serviceRoleKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query_text: message,
+          match_count: 5
+        })
+      });
+
+      if (searchResponse.ok) {
+        relevantKnowledge = await searchResponse.json();
+        // Cache knowledge base results for 1 hour
+        await redisSet(searchCacheKey, relevantKnowledge, 3600)
+      }
     }
 
     // Build context for AI

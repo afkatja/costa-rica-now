@@ -1,5 +1,6 @@
 import costaRicaDestinations from "../../../src/lib/shared/destinations.ts"
 import calculateDistance from "../_shared/calculateDistance.ts"
+import { redisGet, redisSet } from "../_shared/redis-cache.ts"
 import { corsHeaders, withEdgeHandler } from "../_shared/edge-handler.ts"
 
 declare const Deno: any
@@ -27,7 +28,6 @@ Deno.serve(
 
       const weatherData: Record<string, any>[] = []
 
-      // If user has location context and is in Costa Rica, prioritize their location
       let locationsToFetch: WeatherLocation[]
       if (
         locationContext &&
@@ -35,10 +35,8 @@ Deno.serve(
         locationContext.latitude &&
         locationContext.longitude
       ) {
-        // Add user's location first, then nearby destinations within radius
         locationsToFetch = []
 
-        // Add user's current location
         locationsToFetch.push({
           key: "user-location",
           name: "Your Location",
@@ -46,7 +44,6 @@ Deno.serve(
           lon: locationContext.longitude,
         })
 
-        // Add nearby destinations within 100km radius
         const nearbyDestinations = Object.entries(costaRicaDestinations).filter(
           ([key, dest]) => {
             const distance = calculateDistance(
@@ -59,7 +56,6 @@ Deno.serve(
           },
         )
 
-        // Add nearby destinations (limit to 3 to keep response manageable)
         locationsToFetch.push(
           ...nearbyDestinations.slice(0, 3).map(([key, dest]) => ({
             key,
@@ -69,7 +65,6 @@ Deno.serve(
           })),
         )
 
-        // If no nearby destinations, add some popular ones
         if (locationsToFetch.length === 1) {
           locationsToFetch.push(
             { key: "san-jose", ...costaRicaDestinations["san-jose"] },
@@ -80,7 +75,6 @@ Deno.serve(
           )
         }
       } else {
-        // Default behavior: use provided locations or all major destinations
         locationsToFetch =
           locations && locations.length > 0
             ? locations
@@ -104,13 +98,22 @@ Deno.serve(
         if (!location) continue
 
         try {
+          const cacheKey = `weather:${type}:${location.key}`
+          const ttlSeconds = type === "current" ? 600 : 1800 // 10 min current, 30 min forecast
+
+          // Check cache first
+          const cached = await redisGet<any>(cacheKey)
+          if (cached) {
+            console.log(`[weather] Cache hit for ${cacheKey}`)
+            weatherData.push(cached)
+            continue
+          }
+
           let weatherUrl
 
           if (type === "forecast") {
-            // 5-day forecast
             weatherUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${location.lat}&lon=${location.lon}&appid=${openWeatherApiKey}&units=metric`
           } else {
-            // Current weather
             weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${location.lat}&lon=${location.lon}&appid=${openWeatherApiKey}&units=metric`
           }
 
@@ -124,10 +127,10 @@ Deno.serve(
           }
 
           const data = await weatherResponse.json()
+          let processed: any
 
           if (type === "forecast") {
-            // Process forecast data
-            const processedForecast = {
+            processed = {
               location: location.key,
               name: location.name,
               type: "forecast",
@@ -146,10 +149,8 @@ Deno.serve(
               country: data.city.country,
               cached_at: new Date().toISOString(),
             }
-            weatherData.push(processedForecast)
           } else {
-            // Process current weather data
-            const processedWeather = {
+            processed = {
               location: location.key,
               name: location.name,
               type: "current",
@@ -163,23 +164,23 @@ Deno.serve(
                 wind_speed: data.wind.speed,
                 pressure: data.main.pressure,
                 visibility: data.visibility,
-                uv_index: null, // Not available in current weather API
+                uv_index: null,
               },
               city: data.name,
               country: data.sys.country,
               cached_at: new Date().toISOString(),
             }
-            weatherData.push(processedWeather)
           }
 
-          // Small delay to avoid rate limiting
+          await redisSet(cacheKey, processed, ttlSeconds)
+          weatherData.push(processed)
+
           await new Promise(resolve => setTimeout(resolve, 100))
         } catch (locationError) {
           console.error(
             `Error fetching weather for ${location.name}:`,
             locationError,
           )
-          // Continue with other locations even if one fails
         }
       }
 

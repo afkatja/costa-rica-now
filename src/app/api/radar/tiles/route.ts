@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import { kv } from "@vercel/kv"
+import { redisGet, redisSet, redisIncr, redisExpire } from "../../../../lib/redis-cache"
 import { dayInMs, hourInMs } from "../../../../lib/utils"
 
 const TRANSPARENT_PNG = Buffer.from(
@@ -7,39 +7,7 @@ const TRANSPARENT_PNG = Buffer.from(
   "base64",
 )
 
-const CACHE_DURATION = 10 * 60 * 1000 // 10 minutes (weather doesn't change that fast)
-
-// External store client with fallback
-let kvClient: typeof kv | null = null
-let useExternalStore = false
-
-// Initialize KV client safely
-function initializeKV() {
-  if (kvClient !== null) return kvClient
-
-  try {
-    // Check if KV URL is available (production)
-    if (process.env.KV_URL) {
-      kvClient = kv
-      useExternalStore = true
-      console.log("Using Vercel KV for external storage")
-    } else {
-      console.log("KV_URL not found, using in-memory fallback")
-      useExternalStore = false
-    }
-  } catch (error) {
-    console.warn(
-      "Failed to initialize KV client, using in-memory fallback:",
-      error,
-    )
-    useExternalStore = false
-  }
-
-  return kvClient
-}
-
-// Initialize on module load
-initializeKV()
+const CACHE_DURATION = 10 * 60 * 1000 // 10 minutes
 
 // In-memory fallback for local/dev
 const tileCache = new Map<string, { data: Buffer; timestamp: number }>()
@@ -50,7 +18,6 @@ const rateLimiter = {
   lastRequestTime: 0,
 }
 
-// Helper to prune rate limiter arrays based on time windows
 const pruneRateLimiter = (now: number) => {
   const hourAgo = now - hourInMs
   const dayAgo = now - dayInMs
@@ -60,24 +27,14 @@ const pruneRateLimiter = (now: number) => {
   rateLimiter.dailyRequests = rateLimiter.dailyRequests.filter(t => t >= dayAgo)
 }
 
-// External store functions
 async function getCachedTile(
   cacheKey: string,
 ): Promise<{ data: Buffer; timestamp: number } | null> {
-  if (!useExternalStore) {
-    return tileCache.get(cacheKey) || null
+  const cached = await redisGet<{ data: string; timestamp: number }>(`tile:${cacheKey}`)
+  if (cached) {
+    return { data: Buffer.from(cached.data, "base64"), timestamp: cached.timestamp }
   }
-
-  try {
-    const cached = await kvClient!.get(`tile:${cacheKey}`)
-    if (cached) {
-      const { data, timestamp } = JSON.parse(cached as string)
-      return { data: Buffer.from(data, "base64"), timestamp }
-    }
-  } catch (error) {
-    console.warn("Failed to get cached tile from KV:", error)
-  }
-  return null
+  return tileCache.get(cacheKey) || null
 }
 
 async function setCachedTile(
@@ -85,21 +42,10 @@ async function setCachedTile(
   data: Buffer,
   timestamp: number,
 ) {
-  if (!useExternalStore) {
+  const value = { data: data.toString("base64"), timestamp }
+  const ok = await redisSet(`tile:${cacheKey}`, value, Math.floor(CACHE_DURATION / 1000))
+  if (!ok) {
     tileCache.set(cacheKey, { data, timestamp })
-    return
-  }
-
-  try {
-    const value = JSON.stringify({
-      data: data.toString("base64"),
-      timestamp,
-    })
-    await kvClient!.set(`tile:${cacheKey}`, value, {
-      ex: Math.floor(CACHE_DURATION / 1000),
-    })
-  } catch (error) {
-    console.warn("Failed to set cached tile in KV:", error)
   }
 }
 
@@ -108,84 +54,48 @@ async function getRateLimitCounters(): Promise<{
   dailyRequests: number
   lastRequestTime: number
 }> {
-  if (!useExternalStore) {
-    const now = Date.now()
-    const hourAgo = now - hourInMs
-    const dayAgo = now - dayInMs
-    rateLimiter.hourlyRequests = rateLimiter.hourlyRequests.filter(
-      t => t >= hourAgo,
-    )
-    rateLimiter.dailyRequests = rateLimiter.dailyRequests.filter(
-      t => t >= dayAgo,
-    )
-    return {
-      hourlyRequests: rateLimiter.hourlyRequests.length,
-      dailyRequests: rateLimiter.dailyRequests.length,
-      lastRequestTime: rateLimiter.lastRequestTime,
-    }
-  }
+  const now = Date.now()
+  const hourAgo = now - hourInMs
+  const dayAgo = now - dayInMs
+  rateLimiter.hourlyRequests = rateLimiter.hourlyRequests.filter(
+    t => t >= hourAgo,
+  )
+  rateLimiter.dailyRequests = rateLimiter.dailyRequests.filter(t => t >= dayAgo)
 
-  try {
-    const [hourlyRequests, dailyRequests, lastRequestTime] = await Promise.all([
-      kvClient!.get(`ratelimit:hourly`),
-      kvClient!.get(`ratelimit:daily`),
-      kvClient!.get(`ratelimit:lastRequestTime`),
-    ])
+  const [hourlyRequests, dailyRequests, lastRequestTime] = await Promise.all([
+    redisGet<number>(`ratelimit:hourly`),
+    redisGet<number>(`ratelimit:daily`),
+    redisGet<number>(`ratelimit:lastRequestTime`),
+  ])
 
-    return {
-      hourlyRequests: parseInt(hourlyRequests as string) || 0,
-      dailyRequests: parseInt(dailyRequests as string) || 0,
-      lastRequestTime: parseInt(lastRequestTime as string) || 0,
-    }
-  } catch (error) {
-    console.warn("Failed to get rate limit counters from KV:", error)
-    return {
-      hourlyRequests: rateLimiter.hourlyRequests.length,
-      dailyRequests: rateLimiter.dailyRequests.length,
-      lastRequestTime: rateLimiter.lastRequestTime,
-    }
+  return {
+    hourlyRequests: hourlyRequests ?? rateLimiter.hourlyRequests.length,
+    dailyRequests: dailyRequests ?? rateLimiter.dailyRequests.length,
+    lastRequestTime: lastRequestTime ?? rateLimiter.lastRequestTime,
   }
 }
 
 async function recordRateLimitRequest() {
-  if (!useExternalStore) {
-    const now = Date.now()
-    pruneRateLimiter(now)
-    rateLimiter.requests.push(now)
-    rateLimiter.hourlyRequests.push(now)
-    rateLimiter.dailyRequests.push(now)
-    rateLimiter.lastRequestTime = now
-    return
-  }
+  const now = Date.now()
+  pruneRateLimiter(now)
+  rateLimiter.requests.push(now)
+  rateLimiter.hourlyRequests.push(now)
+  rateLimiter.dailyRequests.push(now)
+  rateLimiter.lastRequestTime = now
 
-  try {
-    const now = Date.now()
+  await Promise.all([
+    redisIncr(`ratelimit:hourly`),
+    redisIncr(`ratelimit:daily`),
+    redisSet(`ratelimit:lastRequestTime`, now),
+  ])
 
-    await Promise.all([
-      kvClient!.incr(`ratelimit:hourly`),
-      kvClient!.incr(`ratelimit:daily`),
-      kvClient!.set(`ratelimit:lastRequestTime`, now),
-    ])
-
-    // Set TTLs for automatic reset
-    await Promise.all([
-      kvClient!.expire(`ratelimit:hourly`, 3600), // 1 hour
-      kvClient!.expire(`ratelimit:daily`, 86400), // 1 day
-      kvClient!.expire(`ratelimit:lastRequestTime`, 3600),
-    ])
-  } catch (error) {
-    console.warn("Failed to record rate limit request in KV:", error)
-    // Fallback to in-memory
-    const now = Date.now()
-    pruneRateLimiter(now)
-    rateLimiter.requests.push(now)
-    rateLimiter.hourlyRequests.push(now)
-    rateLimiter.dailyRequests.push(now)
-    rateLimiter.lastRequestTime = now
-  }
+  await Promise.all([
+    redisExpire(`ratelimit:hourly`, 3600),
+    redisExpire(`ratelimit:daily`, 86400),
+    redisExpire(`ratelimit:lastRequestTime`, 3600),
+  ])
 }
 
-// Request queue for managing tile loading
 interface QueuedRequest {
   resolve: (value: Response) => void
   reject: (error: Error) => void
@@ -202,30 +112,21 @@ let isProcessingQueue = false
 
 async function canMakeRequest(): Promise<boolean> {
   const now = Date.now()
-
-  // Clean old requests (in-memory for burst control)
   rateLimiter.requests = rateLimiter.requests.filter(t => now - t < 1000)
-
-  // Prune hourly and daily requests
   pruneRateLimiter(now)
 
-  // Allow burst of 3 requests, then stagger subsequent requests
   const currentSecondRequests = rateLimiter.requests.filter(
     t => now - t < 1000,
   ).length
 
-  // If we haven't hit the 3-request burst limit, allow immediate request
   if (currentSecondRequests < 3) {
     return true
   }
 
-  // If we've hit the burst limit, enforce minimum spacing between requests
-  // Space requests at least 300ms apart to allow 3+ requests per second
   if (now - rateLimiter.lastRequestTime < 300) {
     return false
   }
 
-  // Check hourly and daily limits from external store
   const counters = await getRateLimitCounters()
   if (counters.hourlyRequests >= 25) return false
   if (counters.dailyRequests >= 500) return false
@@ -233,7 +134,6 @@ async function canMakeRequest(): Promise<boolean> {
   return true
 }
 
-// Process queued requests with staggered timing and proper rate limit compliance
 async function processRequestQueue() {
   if (isProcessingQueue || requestQueue.length === 0) return
 
@@ -243,26 +143,20 @@ async function processRequestQueue() {
     const request = requestQueue.shift()!
     const now = Date.now()
 
-    // Clean old requests for proper limit checking (in-memory for burst)
     rateLimiter.requests = rateLimiter.requests.filter(t => now - t < 1000)
-
-    // Prune hourly and daily requests
     pruneRateLimiter(now)
 
     const currentSecondRequests = rateLimiter.requests.filter(
       t => now - t < 1000,
     ).length
 
-    // Get external counters for hourly/daily limits
     const counters = await getRateLimitCounters()
 
-    // If we've hit hourly/daily limits, return cached or transparent tile immediately
     if (counters.hourlyRequests >= 25 || counters.dailyRequests >= 500) {
       console.warn(
         `Rate limit breached (${counters.hourlyRequests}/25 hourly, ${counters.dailyRequests}/500 daily) - returning fallback`,
       )
 
-      // Try to find cached tile first
       const cacheKey = `${request.requestData.zoom}-${request.requestData.x}-${request.requestData.y}-${request.requestData.field}-${request.requestData.time}`
       const cached = await getCachedTile(cacheKey)
 
@@ -287,7 +181,6 @@ async function processRequestQueue() {
       continue
     }
 
-    // Check if we can make a request (short burst control)
     let canRequest = false
     if (currentSecondRequests < 3) {
       canRequest = true
@@ -296,22 +189,18 @@ async function processRequestQueue() {
     }
 
     if (!canRequest) {
-      // Only wait short periods for burst control (100-300ms max)
       await new Promise(resolve => setTimeout(resolve, 100))
-      // Re-queue this request to try again
       requestQueue.unshift(request)
       continue
     }
 
     try {
-      // Execute the actual tile fetch
       const response = await fetchTile(request.requestData)
       request.resolve(response)
     } catch (error) {
       request.reject(error as Error)
     }
 
-    // Small delay between requests to avoid overwhelming the API
     const status = await getRateLimitStatus()
     const delay = status.perHour >= 20 ? 300 : 200
     await new Promise(resolve => setTimeout(resolve, delay))
@@ -320,7 +209,6 @@ async function processRequestQueue() {
   isProcessingQueue = false
 }
 
-// Fetch tile from Tomorrow.io API
 async function fetchTile(requestData: {
   zoom: string
   x: string
@@ -340,7 +228,6 @@ async function fetchTile(requestData: {
   try {
     const cacheKey = `${requestData.zoom}-${requestData.x}-${requestData.y}-${requestData.field}-${requestData.time}`
 
-    // Check cache first
     const cached = await getCachedTile(cacheKey)
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
       return new Response(new Uint8Array(cached.data), {
@@ -366,7 +253,6 @@ async function fetchTile(requestData: {
       })
     }
 
-    // Convert to buffer and cache
     const buffer = Buffer.from(await response.arrayBuffer())
     await setCachedTile(cacheKey, buffer, Date.now())
 
@@ -406,7 +292,6 @@ export async function GET(request: NextRequest) {
     const time = searchParams.get("time") || "now"
     const check = searchParams.get("check")
 
-    // Return radar status if check=true
     if (check === "true") {
       const apiKey = process.env.TOMORROW_API_KEY
       const status = await getRateLimitStatus()
@@ -429,17 +314,13 @@ export async function GET(request: NextRequest) {
     }
 
     const requestData = { zoom, x, y, field, time }
-
-    // Check current rate limit status
     const status = await getRateLimitStatus()
 
-    // If we've hit hourly or daily limits, return cached or transparent tile immediately
     if (status.perHour >= 25 || status.perDay >= 500) {
       console.warn(
         `Rate limit reached (${status.perHour}/25 hourly, ${status.perDay}/500 daily) - returning fallback`,
       )
 
-      // Try to find cached tile first
       const cacheKey = `${zoom}-${x}-${y}-${field}-${time}`
       const cached = await getCachedTile(cacheKey)
 
@@ -463,24 +344,20 @@ export async function GET(request: NextRequest) {
           })
     }
 
-    // For immediate requests (first 3 per second), try to process directly
     if (await canMakeRequest()) {
       try {
         return await fetchTile(requestData)
       } catch (error) {
         console.error("Direct fetch failed, queuing request:", error)
-        // Fall through to queue if direct fetch fails
       }
     }
 
-    // If we're close to hourly limit, warn and still queue
     if (status.perHour >= 23) {
       console.warn(
         `Approaching hourly limit (${status.perHour}/25) - queuing request`,
       )
     }
 
-    // Queue the request for staggered processing
     return new Promise<Response>((resolve, reject) => {
       const timeout = setTimeout(() => {
         const idx = requestQueue.findIndex(r => r.resolve === resolve)
@@ -490,7 +367,7 @@ export async function GET(request: NextRequest) {
             headers: { "Content-Type": "image/png", "X-Timeout": "true" },
           }),
         )
-      }, 30000) // 30s timeout
+      }, 30000)
       requestQueue.push({
         resolve: res => {
           clearTimeout(timeout)
@@ -503,7 +380,6 @@ export async function GET(request: NextRequest) {
         requestData,
       })
 
-      // Start processing queue if not already running
       processRequestQueue()
     })
   } catch (error) {
