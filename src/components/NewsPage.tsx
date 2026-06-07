@@ -1,8 +1,9 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useTranslations, useLocale } from "next-intl"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { NewsFeed } from "./NewsFeed"
-import { mockNewsData, type NewsCategory } from "../utils/mockNewsData"
+import { supabase } from "../utils/supabase/client"
 import {
   TrendingUp,
   Monitor,
@@ -12,52 +13,76 @@ import {
   Music,
   Globe,
 } from "lucide-react"
+import { NewsCategory } from "../types/news"
 
-const categories = [
-  { id: "all", label: "Todas", icon: Globe },
-  { id: "business", label: "Negocios", icon: TrendingUp },
-  { id: "technology", label: "Tecnología", icon: Monitor },
-  { id: "health", label: "Salud", icon: Heart },
-  { id: "science", label: "Ciencia", icon: Lightbulb },
-  { id: "sports", label: "Deportes", icon: Trophy },
-  { id: "entertainment", label: "Entretenimiento", icon: Music },
-  { id: "general", label: "General", icon: Globe },
-] as const
+const categoryIcons = {
+  all: Globe,
+  business: TrendingUp,
+  technology: Monitor,
+  health: Heart,
+  science: Lightbulb,
+  sports: Trophy,
+  entertainment: Music,
+  general: Globe,
+} as const
 
 export function NewsPage() {
+  const t = useTranslations("NewsPage")
+  const locale = useLocale()
   const [activeCategory, setActiveCategory] = useState<NewsCategory>("all")
+  const [articles, setArticles] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleCategoryChange = async (category: NewsCategory) => {
+  // Fetch news articles from the edge function
+  const fetchNews = async (category: NewsCategory) => {
     setLoading(true)
-    setActiveCategory(category)
+    setError(null)
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500))
-    setLoading(false)
+    try {
+      const { data, error } = await supabase.functions.invoke("news-service", {
+        body: {
+          language: locale as "en" | "es",
+          category: category,
+          limit: 20,
+        },
+      })
+
+      if (error) {
+        throw new Error(error.message || "Failed to fetch news")
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error?.message || "Failed to fetch news")
+      }
+      console.log(data.articles[0])
+
+      setArticles(data.articles || [])
+    } catch (err) {
+      console.error("Error fetching news:", err)
+      setError(err instanceof Error ? err.message : "Failed to fetch news")
+      setArticles([])
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const getCurrentArticles = () => {
-    if (activeCategory === "all") {
-      // Combine all articles for "all" category
-      return Object.values(mockNewsData)
-        .flat()
-        .sort(
-          (a, b) =>
-            new Date(b.publishedAt).getTime() -
-            new Date(a.publishedAt).getTime()
-        )
-    }
-    return mockNewsData[activeCategory] || []
+  // Initial fetch
+  useEffect(() => {
+    fetchNews(activeCategory)
+  }, [locale])
+
+  // Handle category change
+  const handleCategoryChange = async (category: NewsCategory) => {
+    setActiveCategory(category)
+    await fetchNews(category)
   }
 
   return (
     <div className="space-y-6">
       <div className="mb-6">
-        <h2 className="mb-2">Últimas Noticias</h2>
-        <p className="text-muted-foreground">
-          Mantente informado con las noticias más recientes de Costa Rica
-        </p>
+        <h2 className="mb-2">{t("title")}</h2>
+        <p className="text-muted-foreground">{t("description")}</p>
       </div>
 
       <Tabs
@@ -67,18 +92,17 @@ export function NewsPage() {
         {/* Horizontal scrollable tabs for mobile */}
         <div className="mb-6">
           <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-1 h-auto p-1">
-            {categories.map(category => {
-              const Icon = category.icon
+            {(Object.keys(categoryIcons) as NewsCategory[]).map(categoryId => {
+              const Icon = categoryIcons[categoryId]
+              const label = t(`categories.${categoryId}` as any)
               return (
                 <TabsTrigger
-                  key={category.id}
-                  value={category.id}
+                  key={categoryId}
+                  value={categoryId}
                   className="flex flex-col items-center gap-1 py-2 px-2 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   <Icon className="h-4 w-4" />
-                  <span className="hidden sm:inline truncate">
-                    {category.label}
-                  </span>
+                  <span className="hidden sm:inline truncate">{label}</span>
                 </TabsTrigger>
               )
             })}
@@ -86,9 +110,16 @@ export function NewsPage() {
         </div>
 
         {/* Tab Content */}
-        {categories.map(category => (
-          <TabsContent key={category.id} value={category.id} className="mt-0">
-            <NewsFeed articles={getCurrentArticles()} loading={loading} />
+        {(Object.keys(categoryIcons) as NewsCategory[]).map(categoryId => (
+          <TabsContent key={categoryId} value={categoryId} className="mt-0">
+            {error ? (
+              <div className="p-4 text-center text-muted-foreground">
+                {t("error")}
+                <p className="text-sm mt-2">{error}</p>
+              </div>
+            ) : (
+              <NewsFeed articles={articles} loading={loading} />
+            )}
           </TabsContent>
         ))}
       </Tabs>

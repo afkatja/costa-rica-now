@@ -19,6 +19,7 @@
     "description": "Información local personalizada en tiempo real"
   },
   "WeatherPage": {
+    "readMore": "Leer más",
     "title": "Clima en Costa Rica",
     "currentConditions": "Condiciones Actuales",
     "lastUpdated": "Actualizado",
@@ -153,6 +154,22 @@
       "HO": "Holoceno (últimos 10,000 años)",
       "Q": "Cuaternario (últimos 2.6 millones de años)",
       "U": "Desconocido"
+    }
+  },
+  "NewsPage": {
+    "readMore": "Leer más",
+    "title": "Últimas Noticias",
+    "description": "Mantente informado con las noticias más recientes de Costa Rica",
+    "error": "Error al cargar las noticias. Por favor, intenta de nuevo más tarde.",
+    "categories": {
+      "all": "Todas",
+      "business": "Negocios",
+      "technology": "Tecnología",
+      "health": "Salud",
+      "science": "Ciencia",
+      "sports": "Deportes",
+      "entertainment": "Entretenimiento",
+      "general": "General"
     }
   }
 }

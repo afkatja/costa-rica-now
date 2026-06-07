@@ -1,19 +1,19 @@
-import { NewsCard } from "./NewsCard";
+import { NewsCard } from "./NewsCard"
 
 interface NewsArticle {
-  title: string;
-  description: string;
-  url: string;
-  urlToImage: string | null;
-  publishedAt: string;
+  title: string
+  description: string
+  url: string
+  urlToImage: string | null
+  publishedAt: string
   source: {
-    name: string;
-  };
+    name: string
+  }
 }
 
 interface NewsFeedProps {
-  articles: NewsArticle[];
-  loading?: boolean;
+  articles: NewsArticle[]
+  loading?: boolean
 }
 
 export function NewsFeed({ articles, loading = false }: NewsFeedProps) {
@@ -26,7 +26,7 @@ export function NewsFeed({ articles, loading = false }: NewsFeedProps) {
           </div>
         ))}
       </div>
-    );
+    )
   }
 
   if (articles.length === 0) {
@@ -37,14 +37,14 @@ export function NewsFeed({ articles, loading = false }: NewsFeedProps) {
           Intenta seleccionar otra categoría o actualiza la página.
         </p>
       </div>
-    );
+    )
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {articles.map((article, index) => (
         <NewsCard key={`${article.url}-${index}`} article={article} />
       ))}
     </div>
-  );
+  )
 }

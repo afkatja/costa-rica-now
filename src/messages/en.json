@@ -21,6 +21,7 @@
     "description": "Real-time local personalized information"
   },
   "WeatherPage": {
+    "readMore": "Read more",
     "title": "Weather in Costa Rica",
     "currentConditions": "Current Conditions for",
     "lastUpdated": "Last updated",
@@ -181,5 +182,21 @@
     "title": "Map Error",
     "message": "Unable to load the map. Please try refreshing the page.",
     "refreshButton": "Refresh Page"
+  },
+  "NewsPage": {
+    "readMore": "Read more",
+    "title": "Latest News",
+    "description": "Stay informed with the latest news from Costa Rica",
+    "error": "Error loading news. Please try again later.",
+    "categories": {
+      "all": "All",
+      "business": "Business",
+      "technology": "Technology",
+      "health": "Health",
+      "science": "Science",
+      "sports": "Sports",
+      "entertainment": "Entertainment",
+      "general": "General"
+    }
   }
 }

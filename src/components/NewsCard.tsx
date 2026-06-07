@@ -1,7 +1,9 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
+import { useTranslations } from "next-intl";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { getImageProxyUrl } from "../lib/image-proxy";
 
 interface NewsArticle {
   title: string;
@@ -19,6 +21,8 @@ interface NewsCardProps {
 }
 
 export function NewsCard({ article }: NewsCardProps) {
+  const t = useTranslations('NewsPage');
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-CR', {
       year: 'numeric',
@@ -34,14 +38,16 @@ export function NewsCard({ article }: NewsCardProps) {
   };
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card className="h-full flex flex-col cursor-pointer" onClick={handleReadMore}>
       <CardHeader className="p-0">
         {article.urlToImage && (
-          <div className="aspect-video w-full overflow-hidden rounded-t-lg">
+          <div className="relative aspect-video w-full overflow-hidden rounded-t-lg">
             <ImageWithFallback
-              src={article.urlToImage}
+              src={getImageProxyUrl(article.urlToImage)}
               alt={article.title}
-              className="w-full h-full object-cover"
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              className="object-cover"
             />
           </div>
         )}
@@ -68,7 +74,7 @@ export function NewsCard({ article }: NewsCardProps) {
           className="w-full"
           variant="outline"
         >
-          Leer más
+            {t('readMore')}
         </Button>
       </CardFooter>
     </Card>
