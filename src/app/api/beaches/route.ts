@@ -251,7 +251,7 @@ function processTideData(tideData: any) {
 function processWaveData(marineData: any) {
   if (!marineData?.hourly) {
     return {
-      current: { height: 0, direction: 0, time: new Date().toISOString() },
+      current: { height: 0, direction: 0, directionCardinal: "N", time: new Date().toISOString() },
       forecast: [],
       average24h: 0,
       max24h: 0,
