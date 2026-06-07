@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": ["deno.window"],
+    "strict": true
+  },
+  "lint": {
+    "files": {
+      "include": ["**/*.ts"],
+      "exclude": ["_test_"]
+    },
+    "rules": {
+      "tags": ["recommended"],
+      "exclude": ["no-unused-vars"]
+    }
+  },
+  "fmt": {
+    "files": {
+      "include": ["**/*.ts"],
+      "exclude": ["_test_"]
+    },
+    "options": {
+      "useTabs": false,
+      "lineWidth": 100,
+      "indentWidth": 2,
+      "singleQuote": true,
+      "proseWrap": "preserve"
+    }
+  },
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env --allow-read index.ts"
+  },
+  "imports": {
+    "std/": "https://deno.land/std@0.208.0/"
+  }
+}
