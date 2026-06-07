@@ -197,7 +197,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
   }
 
   // Fetch weather data for all regions
-  const refreshWeather = async () => {
+  const refreshWeather = useCallback(async () => {
     try {
       setLoading(prev => ({ ...prev, weather: true }))
       setErrors(prev => ({ ...prev, weather: null }))
@@ -241,10 +241,10 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
     } finally {
       setLoading(prev => ({ ...prev, weather: false }))
     }
-  }
+  }, [])
 
   // Fetch radar data for all regions (simulated based on available radar data)
-  const refreshRadar = async () => {
+  const refreshRadar = useCallback(async () => {
     try {
       setLoading(prev => ({ ...prev, radar: true }))
       setErrors(prev => ({ ...prev, radar: null }))
@@ -285,7 +285,7 @@ export const WeatherDataProvider: React.FC<WeatherDataProviderProps> = ({
     } finally {
       setLoading(prev => ({ ...prev, radar: false }))
     }
-  }
+  }, [])
 
   /** Fetches tide and wave data for all coastal destinations with error handling */
   const refreshTides = useCallback(async () => {

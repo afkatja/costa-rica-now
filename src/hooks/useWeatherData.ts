@@ -11,10 +11,10 @@ export function useWeatherPage() {
     useWeatherData()
 
   useEffect(() => {
-    if (weatherData.length === 0) {
+    if (!weatherData || weatherData.length === 0) {
       refreshWeather()
     }
-  }, [weatherData.length, refreshWeather])
+  }, [weatherData, refreshWeather])
 
   /** Retries weather fetch after a 30-second backoff delay */
   const retryRefreshWeather = useCallback(async () => {
