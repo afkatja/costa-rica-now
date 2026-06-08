@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useTranslations, useLocale } from "next-intl"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { NewsFeed } from "./NewsFeed"
@@ -12,6 +12,8 @@ import {
   Trophy,
   Music,
   Globe,
+  Leaf,
+  Flame,
 } from "lucide-react"
 import { NewsCategory } from "../types/news"
 
@@ -23,59 +25,95 @@ const categoryIcons = {
   science: Lightbulb,
   sports: Trophy,
   entertainment: Music,
-  general: Globe,
+  environment: Leaf,
+  top: Flame,
 } as const
+
+interface NewsFeedResponse {
+  success: boolean
+  articles: any[]
+  nextPage: string | null
+}
 
 export function NewsPage() {
   const t = useTranslations("NewsPage")
   const locale = useLocale()
   const [activeCategory, setActiveCategory] = useState<NewsCategory>("all")
   const [articles, setArticles] = useState<any[]>([])
+  const [nextPage, setNextPage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch news articles from the edge function
-  const fetchNews = async (category: NewsCategory) => {
-    setLoading(true)
-    setError(null)
+  const fetchNews = useCallback(
+    async (category: NewsCategory, page?: string) => {
+      const isFirstPage = !page
 
-    try {
-      const { data, error } = await supabase.functions.invoke("news-service", {
-        body: {
-          language: locale as "en" | "es",
-          category: category,
-          limit: 20,
-        },
-      })
-
-      if (error) {
-        throw new Error(error.message || "Failed to fetch news")
+      if (isFirstPage) {
+        setLoading(true)
+      } else {
+        setLoadingMore(true)
       }
+      setError(null)
 
-      if (!data?.success) {
-        throw new Error(data?.error?.message || "Failed to fetch news")
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          "news-service",
+          {
+            body: {
+              language: locale as "en" | "es",
+              category: category,
+              ...(page && { page }),
+            },
+          },
+        )
+
+        if (error) {
+          throw new Error(error.message || "Failed to fetch news")
+        }
+
+        const response = data as NewsFeedResponse
+
+        if (!response?.success) {
+          throw new Error("Failed to fetch news")
+        }
+
+        if (isFirstPage) {
+          setArticles(response.articles || [])
+        } else {
+          setArticles(prev => [...prev, ...(response.articles || [])])
+        }
+
+        setNextPage(response.nextPage)
+      } catch (err) {
+        console.error("Error fetching news:", err)
+        setError(err instanceof Error ? err.message : "Failed to fetch news")
+        if (isFirstPage) {
+          setArticles([])
+        }
+      } finally {
+        setLoading(false)
+        setLoadingMore(false)
       }
-      console.log(data.articles[0])
-
-      setArticles(data.articles || [])
-    } catch (err) {
-      console.error("Error fetching news:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch news")
-      setArticles([])
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+    [locale],
+  )
 
   // Initial fetch
   useEffect(() => {
     fetchNews(activeCategory)
-  }, [locale])
+  }, [activeCategory, fetchNews])
 
   // Handle category change
-  const handleCategoryChange = async (category: NewsCategory) => {
+  const handleCategoryChange = (category: NewsCategory) => {
     setActiveCategory(category)
-    await fetchNews(category)
+    setNextPage(null)
+  }
+
+  // Load more articles
+  const handleLoadMore = async () => {
+    if (loadingMore || !nextPage) return
+    await fetchNews(activeCategory, nextPage)
   }
 
   return (
@@ -89,7 +127,6 @@ export function NewsPage() {
         value={activeCategory}
         onValueChange={value => handleCategoryChange(value as NewsCategory)}
       >
-        {/* Horizontal scrollable tabs for mobile */}
         <div className="mb-6">
           <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-1 h-auto p-1">
             {(Object.keys(categoryIcons) as NewsCategory[]).map(categoryId => {
@@ -109,7 +146,6 @@ export function NewsPage() {
           </TabsList>
         </div>
 
-        {/* Tab Content */}
         {(Object.keys(categoryIcons) as NewsCategory[]).map(categoryId => (
           <TabsContent key={categoryId} value={categoryId} className="mt-0">
             {error ? (
@@ -118,7 +154,13 @@ export function NewsPage() {
                 <p className="text-sm mt-2">{error}</p>
               </div>
             ) : (
-              <NewsFeed articles={articles} loading={loading} />
+              <NewsFeed
+                articles={articles}
+                loading={loading}
+                loadingMore={loadingMore}
+                hasMore={nextPage !== null}
+                onLoadMore={handleLoadMore}
+              />
             )}
           </TabsContent>
         ))}

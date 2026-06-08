@@ -186,8 +186,14 @@
   "NewsPage": {
     "readMore": "Read more",
     "title": "Latest News",
+    "viewPreview": "View preview",
+    "readFullArticle": "Read full article",
     "description": "Stay informed with the latest news from Costa Rica",
     "error": "Error loading news. Please try again later.",
+    "noNewsAvailable": "No news available",
+    "emptyMessage": "Try selecting another category or refresh the page.",
+    "loadMore": "Load more",
+    "loading": "Loading...",
     "categories": {
       "all": "All",
       "business": "Business",
@@ -196,7 +202,8 @@
       "science": "Science",
       "sports": "Sports",
       "entertainment": "Entertainment",
-      "general": "General"
+      "environment": "Environment",
+      "top": "Top Stories"
     }
   }
 }
