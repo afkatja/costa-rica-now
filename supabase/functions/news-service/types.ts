@@ -8,7 +8,8 @@ export type NewsCategory =
   | 'science'
   | 'sports'
   | 'entertainment'
-  | 'general'
+  | 'environment'
+  | 'top'
 
 export type NewsLanguage = 'en' | 'es'
 
@@ -30,13 +31,14 @@ export interface NewsArticle {
 export interface NewsApiParams {
   language: NewsLanguage
   category: NewsCategory
-  limit?: number
+  page?: string
   bypassCache?: boolean
 }
 
 export interface NewsApiResponse {
   success: boolean
   articles: NewsArticle[]
+  nextPage: string | null
   metadata: NewsResponseMetadata
 }
 
@@ -63,6 +65,7 @@ export interface NewsDataIOResponse {
   status: string
   totalResults: number
   results: NewsDataIOArticle[]
+  nextPage: string | null
 }
 
 export interface NewsDataIOArticle {

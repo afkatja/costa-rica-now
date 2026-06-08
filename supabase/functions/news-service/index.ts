@@ -20,9 +20,10 @@ function validateParams(params: any): {
   language: NewsLanguage
   category: NewsCategory
   limit: number
+  page: string | undefined
   bypassCache: boolean
 } {
-  const { language, category, limit, bypassCache } = params
+  const { language, category, page, bypassCache } = params
 
   // Validate language
   if (language && language !== "en" && language !== "es") {
@@ -32,6 +33,7 @@ function validateParams(params: any): {
       language: "es",
       category: "all",
       limit: PAGINATION_DEFAULTS.DEFAULT_LIMIT,
+      page: undefined,
       bypassCache: false,
     }
   }
@@ -45,7 +47,8 @@ function validateParams(params: any): {
     "science",
     "sports",
     "entertainment",
-    "general",
+    "environment",
+    "top",
   ]
   if (category && !validCategories.includes(category)) {
     return {
@@ -54,26 +57,8 @@ function validateParams(params: any): {
       language: "es",
       category: "all",
       limit: PAGINATION_DEFAULTS.DEFAULT_LIMIT,
+      page: undefined,
       bypassCache: false,
-    }
-  }
-
-  // Validate limit
-  if (limit !== undefined) {
-    const numLimit = Number(limit)
-    if (
-      isNaN(numLimit) ||
-      numLimit < 1 ||
-      numLimit > PAGINATION_DEFAULTS.MAX_LIMIT
-    ) {
-      return {
-        valid: false,
-        error: `Invalid limit: ${limit}. Must be between 1 and ${PAGINATION_DEFAULTS.MAX_LIMIT}.`,
-        language: "es",
-        category: "all",
-        limit: PAGINATION_DEFAULTS.DEFAULT_LIMIT,
-        bypassCache: false,
-      }
     }
   }
 
@@ -81,8 +66,8 @@ function validateParams(params: any): {
     valid: true,
     language: (language || "es") as NewsLanguage,
     category: (category || "all") as NewsCategory,
-    limit:
-      limit !== undefined ? Number(limit) : PAGINATION_DEFAULTS.DEFAULT_LIMIT,
+    limit: PAGINATION_DEFAULTS.DEFAULT_LIMIT,
+    page: page || undefined,
     bypassCache: bypassCache === true,
   }
 }
@@ -131,54 +116,26 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    const { language, category, limit, bypassCache } = validation
-
-    // Generate cache key
-    const cacheKey = generateCacheKey(language, category)
-
-    // Check cache first (unless bypassed)
-    if (!bypassCache) {
-      const cached = await getCachedData(cacheKey)
-      if (cached) {
-        console.log("[news-service] Returning cached data")
-        return new Response(
-          JSON.stringify({
-            success: true,
-            articles: cached.articles,
-            metadata: {
-              language,
-              category,
-              source: "cache",
-              cached: true,
-              fetchedAt: cached.metadata.fetchedAt,
-              cacheExpiresAt: cached.metadata.expiresAt,
-              totalResults: cached.articles.length,
-            },
-          } as NewsApiResponse),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        )
-      }
-    }
+    const { language, category, limit, page, bypassCache } = validation
 
     // Fetch from APIs with fallback
     console.log("[news-service] Fetching from APIs")
-    const { articles, source } = await fetchWithFallback(
+    const { articles, nextPage, source } = await fetchWithFallback(
       language,
       category,
       limit,
+      page,
     )
 
-    // Cache the results
-    if (articles.length > 0) {
+    // Cache first page results
+    if (articles.length > 0 && !page) {
+      const cacheKey = generateCacheKey(language, category)
       const cacheEntry: CacheEntry = {
         articles,
         metadata: {
           source,
           fetchedAt: new Date().toISOString(),
-          expiresAt: "", // Will be set by setCachedData
+          expiresAt: "",
         },
       }
       await setCachedData(cacheKey, cacheEntry)
@@ -188,6 +145,7 @@ Deno.serve(async (req: Request) => {
     const response: NewsApiResponse = {
       success: true,
       articles,
+      nextPage,
       metadata: {
         language,
         category,
@@ -201,8 +159,10 @@ Deno.serve(async (req: Request) => {
     console.log("[news-service] Response:", {
       source,
       articleCount: articles.length,
+      nextPage,
       language,
       category,
+      page,
     })
 
     return new Response(JSON.stringify(response), {

@@ -5,6 +5,7 @@ import {
   CATEGORY_MAPPINGS,
   COUNTRY_CODE,
   LANGUAGE_CODES,
+  PAGINATION_DEFAULTS,
   REQUEST_HEADERS,
   TIMEOUT_CONFIG,
 } from "./config.ts"
@@ -63,7 +64,8 @@ export async function fetchNewsDataIO(
   language: NewsLanguage,
   category: NewsCategory,
   limit: number,
-): Promise<NewsArticle[]> {
+  page?: string,
+): Promise<{ articles: NewsArticle[]; nextPage: string | null }> {
   const apiKey = Deno.env.get("NEWSDATAIO_API_KEY")
 
   if (!apiKey) {
@@ -80,10 +82,21 @@ export async function fetchNewsDataIO(
     apikey: apiKey,
     language: languageParam,
     country: COUNTRY_CODE,
+    size: String(limit),
   })
+
+  // newsdata.io's country filter is loose for English — add keyword search for relevance
+  if (language === "en") {
+    queryParams.append("q", "Costa Rica")
+  }
 
   if (categoryParam) {
     queryParams.append("category", categoryParam)
+  }
+
+  // newsdata.io uses cursor-based pagination: pass the nextPage string from previous response
+  if (page) {
+    queryParams.append("page", page)
   }
 
   const url = `${API_ENDPOINTS.NEWSDATA_IO}?${queryParams.toString()}`
@@ -92,7 +105,7 @@ export async function fetchNewsDataIO(
     url: url.replace(apiKey, "***"),
     language,
     category,
-    limit,
+    page: page || 1,
   })
 
   try {
@@ -116,15 +129,15 @@ export async function fetchNewsDataIO(
 
     console.log("[fetchers] newsdata.io success:", {
       totalResults: data.totalResults,
-      returned: Math.min(data.results.length, limit),
+      returned: data.results.length,
+      nextPage: data.nextPage,
     })
 
-    // Transform and limit results
-    const transformed = data.results
-      .map(article => transformNewsDataIOArticle(article, category))
-      .slice(0, limit)
+    const transformed = data.results.map(article =>
+      transformNewsDataIOArticle(article, category),
+    )
 
-    return transformed
+    return { articles: transformed, nextPage: data.nextPage || null }
   } catch (error) {
     console.error("[fetchers] newsdata.io fetch error:", error)
     throw error
@@ -136,18 +149,20 @@ export async function fetchNewsApiAI(
   language: NewsLanguage,
   category: NewsCategory,
   limit: number,
-): Promise<NewsArticle[]> {
+  page?: string,
+): Promise<{ articles: NewsArticle[]; nextPage: string | null }> {
   const apiKey = Deno.env.get("NEWSAPIAI_API_KEY")
 
   if (!apiKey) {
     throw new Error("NEWSAPIAI_API_KEY not configured")
   }
 
-  // Map our language codes to Event Registry ISO 639-2 codes
   const langMap: Record<NewsLanguage, string> = { en: "eng", es: "spa" }
   const targetLang = langMap[language]
 
-  const requestBody = {
+  const articlePage = page ? Number(page) : 1
+
+  const requestBody: Record<string, unknown> = {
     query: {
       $query: {
         $and: [
@@ -166,13 +181,14 @@ export async function fetchNewsApiAI(
     resultType: "articles",
     articlesSortBy: "date",
     articlesCount: limit,
+    articlesPage: articlePage,
     apiKey,
   }
 
   console.log("[fetchers] Fetching from newsapi.ai (Event Registry):", {
     language,
     category,
-    limit,
+    page: page || 1,
   })
 
   try {
@@ -199,20 +215,23 @@ export async function fetchNewsApiAI(
       console.warn("[fetchers] newsapi.ai returned unexpected structure:", {
         hasArticles: !!data.articles,
       })
-      return []
+      return { articles: [], nextPage: null }
     }
+
+    const hasMore = articlePage * limit < data.articles.totalResults
+    const nextPage = hasMore ? String(articlePage + 1) : null
 
     console.log("[fetchers] newsapi.ai success:", {
       totalResults: data.articles.totalResults,
       returned: data.articles.results.length,
+      nextPage,
     })
 
-    // Transform results
-    const transformed = data.articles.results
-      .map(article => transformNewsApiAIArticle(article, category))
-      .slice(0, limit)
+    const transformed = data.articles.results.map(article =>
+      transformNewsApiAIArticle(article, category),
+    )
 
-    return transformed
+    return { articles: transformed, nextPage }
   } catch (error) {
     console.error("[fetchers] newsapi.ai fetch error:", error)
     throw error
@@ -224,11 +243,16 @@ export async function fetchWithFallback(
   language: NewsLanguage,
   category: NewsCategory,
   limit: number,
-): Promise<{ articles: NewsArticle[]; source: "newsdata_io" | "newsapi_ai" }> {
+  page?: string,
+): Promise<{
+  articles: NewsArticle[]
+  nextPage: string | null
+  source: "newsdata_io" | "newsapi_ai"
+}> {
   // Try newsdata.io first
   try {
-    const articles = await fetchNewsDataIO(language, category, limit)
-    return { articles, source: "newsdata_io" }
+    const result = await fetchNewsDataIO(language, category, limit, page)
+    return { ...result, source: "newsdata_io" }
   } catch (error) {
     console.warn(
       "[fetchers] newsdata.io failed, falling back to newsapi.ai:",
@@ -237,8 +261,8 @@ export async function fetchWithFallback(
 
     // Fall back to newsapi.ai
     try {
-      const articles = await fetchNewsApiAI(language, category, limit)
-      return { articles, source: "newsapi_ai" }
+      const result = await fetchNewsApiAI(language, category, limit, page)
+      return { ...result, source: "newsapi_ai" }
     } catch (fallbackError) {
       console.error("[fetchers] Both APIs failed:", {
         primary: error instanceof Error ? error.message : String(error),

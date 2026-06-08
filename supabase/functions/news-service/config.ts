@@ -37,7 +37,7 @@ export const COUNTRY_CODE = "cr"
 
 // Pagination defaults
 export const PAGINATION_DEFAULTS = {
-  DEFAULT_LIMIT: 20,
+  DEFAULT_LIMIT: 10,
   MAX_LIMIT: 100,
 } as const
 
@@ -64,7 +64,8 @@ const BASE_CATEGORY_MAPPINGS = {
   science: "science",
   sports: "sports",
   entertainment: "entertainment",
-  general: "general",
+  environment: "environment",
+  top: "top",
 } as const
 
 // Category mappings for newsdata.io
