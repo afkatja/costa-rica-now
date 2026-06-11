@@ -3,31 +3,35 @@ name: Ping Supabase
 on:
   schedule:
     # Run every 5 days at midnight UTC (days 1, 6, 11, 16, 21, 26, 31)
-    - cron: '0 0 */5 * *'
+    - cron: "0 0 */5 * *"
   workflow_dispatch: # Allow manual triggering
 
 jobs:
   ping-supabase:
     name: Ping Supabase Project
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Ping Supabase
-        run: |
-          # Ping the Supabase project to keep it awake
-          # Uses the SUPABASE_URL secret which should be set in GitHub repository settings
-          if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
-            echo "Error: SUPABASE_URL secret is not set"
-            echo "Please add SUPABASE_URL to your repository secrets"
-            exit 1
-          fi
-          
-          echo "Pinging Supabase at ${{ secrets.SUPABASE_URL }}"
-          curl -f -s -o /dev/null -w "HTTP Status: %{http_code}\n" --connect-timeout 10 --max-time 30 "${{ secrets.SUPABASE_URL }}"
-          
-          if [ $? -eq 0 ]; then
-            echo "Successfully pinged Supabase"
-          else
-            echo "Failed to ping Supabase"
-            exit 1
-          fi
+  run: |
+    if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
+      echo "Error: SUPABASE_URL secret is not set"
+      echo "Please add SUPABASE_URL to your repository secrets"
+      exit 1
+    fi
+
+    echo "Pinging Supabase at ${{ secrets.SUPABASE_URL }}"
+
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+      --connect-timeout 10 \
+      --max-time 30 \
+      "${{ secrets.SUPABASE_URL }}")
+
+    echo "HTTP Status: $HTTP_STATUS"
+
+    if [[ "$HTTP_STATUS" -ge 200 && "$HTTP_STATUS" -lt 400 ]]; then
+      echo "Successfully pinged Supabase"
+    else
+      echo "Failed to ping Supabase (HTTP $HTTP_STATUS)"
+      exit 1
+    fi
