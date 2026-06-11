@@ -4,15 +4,15 @@ on:
   schedule:
     # Run every 5 days at midnight UTC (days 1, 6, 11, 16, 21, 26, 31)
     - cron: "0 0 */5 * *"
-  workflow_dispatch: # Allow manual triggering
+  workflow_dispatch:
 
-  jobs:
-    ping-supabase:
-      name: Ping Supabase Project
-      runs-on: ubuntu-latest
+jobs:
+  ping-supabase:
+    name: Ping Supabase Project
+    runs-on: ubuntu-latest
 
-      steps:
-        - name: Ping Supabase
+    steps:
+      - name: Ping Supabase
         run: |
           if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
             echo "Error: SUPABASE_URL secret is not set"
