@@ -1,0 +1,86 @@
+import type { KnowledgeSeed } from "./beaches.ts"
+
+export const seismicSeeds: KnowledgeSeed[] = [
+  {
+    title: "Costa Rica Earthquake Activity Overview",
+    content: "Costa Rica is located in a seismically active region where the Cocos Plate subducts beneath the Caribbean Plate. Earthquakes are common, with several magnitude 4-5 events monthly and larger events (M6+) occurring every few years. The Nicoya Peninsula, Central Valley, and southern Pacific coast are the most active regions. The country has excellent seismic monitoring through OVSICORI (Universidad Nacional) and RSN (Universidad de Costa Rica).",
+    category: "seismic",
+    location: "General",
+    tags: ["earthquake", "tectonic", "subduction zone", "seismic activity", "general information"],
+    sourceType: "seismic",
+  },
+  {
+    title: "Costa Rica Volcano Monitoring",
+    content: "Costa Rica has five active volcanoes: Arenal (northwestern), Poás (central highlands), Irazú (central highlands), Turrialba (central highlands), and Rincón de la Vieja (Guanacaste). Poás and Turrialba have had significant activity in recent years with ash eruptions. Arenal is currently dormant but monitored. Rincón de la Vieja has occasional phreatic eruptions. OVSICORI maintains 24/7 monitoring with seismic stations, gas sensors, and webcams.",
+    category: "seismic",
+    location: "General",
+    tags: ["volcano", "volcanic activity", "monitoring", "arenvol", "poás", "tirrialba"],
+    sourceType: "seismic",
+  },
+  {
+    title: "Earthquake Safety Tips for Costa Rica",
+    content: "If you feel an earthquake in Costa Rica: drop, cover, and hold on. Stay away from windows and heavy objects. If you're at the beach and feel a strong earthquake, immediately move to high ground as tsunami risk exists, especially along the Pacific coast. Costa Rica has a national tsunami warning system. Most buildings in Costa Rica are built to seismic codes. Emergency contact: 9-1-1. Download the OVSICORI app for real-time earthquake alerts.",
+    category: "seismic",
+    location: "General",
+    tags: ["safety", "emergency", "earthquake preparedness", "tsunami", "travel safety"],
+    sourceType: "seismic",
+  },
+  {
+    title: "Arenal Volcano Area Guide",
+    content: "Arenal Volcano (1,670m) was Costa Rica's most active volcano from 1968-2010, with regular lava flows and eruptions. It is currently in a resting phase but remains under constant monitoring. The area around Arenal has developed into a major tourist destination with hot springs fed by geothermal activity, hanging bridges, zip-lining, and hiking trails on the old lava flows. The nearby town of La Fortuna is the main hub. Seismic activity is monitored by OVSICORI with multiple stations around the volcano.",
+    category: "seismic",
+    location: "Arenal Volcano",
+    tags: ["volcano", "arenal", "hot springs", "la fortuna", "hiking"],
+    sourceType: "seismic",
+  },
+  {
+    title: "Poás Volcano Activity and Access",
+    content: "Poás Volcano (2,708m) is one of Costa Rica's most active volcanoes with frequent phreatic eruptions and gas emissions. The main crater contains an acidic lake that changes color based on volcanic activity. Recent eruptions in 2017-2019 caused park closures. The national park has viewing platforms near the main crater. Due to gas emissions, visits are limited to 20 minutes. Check OVSICORI alerts before visiting. The volcano is located 1.5 hours from San José in the Central Highlands.",
+    category: "seismic",
+    location: "San José",
+    tags: ["volcano", "poás", "crater lake", "national park", "central highlands"],
+    sourceType: "seismic",
+  },
+  {
+    title: "USGS Earthquake Data for Costa Rica",
+    content: "The United States Geological Survey (USGS) provides real-time earthquake data for Costa Rica and surrounding regions. USGS monitors all earthquakes with magnitude 2.5+ in the Costa Rica area. Data includes magnitude, depth, location, and felt reports. For the most recent earthquakes in Costa Rica, query the USGS API with coordinates within latitude 8.0-11.5N and longitude 82.5-86.0W. USGS data is available in GeoJSON format through their FDSN event API.",
+    category: "seismic",
+    location: "General",
+    tags: ["usgs", "earthquake data", "monitoring", "api", "seismic network"],
+    sourceType: "seismic",
+  },
+  {
+    title: "OVSICORI Seismic Monitoring Network",
+    content: "OVSICORI (Observatorio Vulcanológico y Sismológico de Costa Rica) is the primary seismic monitoring institution in Costa Rica, based at Universidad Nacional in Heredia. They operate a network of over 100 seismic stations nationwide. OVSICORI provides real-time earthquake detection, location, and magnitude estimation. Their public website and mobile app provide real-time earthquake information. They monitor all seismic activity including tectonic earthquakes and volcanic tremors.",
+    category: "seismic",
+    location: "General",
+    tags: ["ovsicori", "seismic monitoring", "earthquake detection", "universidad nacional"],
+    sourceType: "seismic",
+  },
+  {
+    title: "RSN Seismic Network at Universidad de Costa Rica",
+    content: "The Red Sismológica Nacional (RSN) is operated jointly by the Universidad de Costa Rica and the Instituto Costarricense de Electricidad (ICE). RSN operates seismic stations throughout Costa Rica and provides earthquake data to international databases including the ISC (International Seismological Centre). RSN data complements OVSICORI monitoring, providing redundant coverage. Both institutions collaborate on seismic hazard assessment and public education.",
+    category: "seismic",
+    location: "General",
+    tags: ["rsn", "ucr", "ice", "seismic network", "earthquake research"],
+    sourceType: "seismic",
+  },
+  {
+    title: "Tsunami Risk in Costa Rica",
+    content: "Costa Rica's Pacific coast faces tsunami risk from subduction zone earthquakes. Notable tsunamis include 1992 (Nicaragua-Costa Rica border, M7.7) and smaller events. The national tsunami warning system uses seismic data from OVSICORI, RSN, and international monitoring centers. Warning signs include strong ground shaking lasting more than 20 seconds, rapid sea level changes, and a loud roaring sound from the ocean. Evacuation routes are marked in coastal communities. The Caribbean coast has lower tsunami risk.",
+    category: "seismic",
+    location: "General",
+    tags: ["tsunami", "safety", "coastal warning", "evacuation", "pacific coast"],
+    sourceType: "seismic",
+  },
+  {
+    title: "Seismic Activity by Costa Rica Region",
+    content: "Costa Rica's seismic activity varies by region. The Nicoya Peninsula experiences frequent intermediate-depth earthquakes from the subducting Cocos Plate. The Central Valley (San José area) experiences occasional shallow crustal earthquakes. The southern Pacific region (Osa Peninsula, Golfito) has frequent small-to-moderate events. The Caribbean slope is less seismically active. Depth of earthquakes ranges from shallow (0-30km) to intermediate (30-100km) with some deep events (>100km) in the Nicoya seismic gap zone.",
+    category: "seismic",
+    location: "General",
+    tags: ["regional seismicity", "nicoya", "central valley", "osa peninsula", "depth analysis"],
+    sourceType: "seismic",
+  },
+]
+
+export { type KnowledgeSeed } from "./beaches.ts"
