@@ -2,36 +2,16 @@ name: Ping Supabase
 
 on:
   schedule:
-    # Run every 5 days at midnight UTC (days 1, 6, 11, 16, 21, 26, 31)
-    - cron: "0 0 */5 * *"
+    - cron: "17 3 * * *" # every day at 03:17 UTC
   workflow_dispatch:
 
 jobs:
-  ping-supabase:
-    name: Ping Supabase Project
+  keepalive:
     runs-on: ubuntu-latest
-
     steps:
       - name: Ping Supabase
         run: |
-          if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
-            echo "Error: SUPABASE_URL secret is not set"
-            echo "Please add SUPABASE_URL to your repository secrets"
-            exit 1
-          fi
-
-          echo "Pinging Supabase at ${{ secrets.SUPABASE_URL }}"
-
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            --connect-timeout 10 \
-            --max-time 30 \
-            "${{ secrets.SUPABASE_URL }}")
-
-          echo "HTTP Status: $HTTP_STATUS"
-
-          if [[ "$HTTP_STATUS" -ge 200 && "$HTTP_STATUS" -lt 400 ]]; then
-            echo "Successfully pinged Supabase"
-          else
-            echo "Failed to ping Supabase (HTTP $HTTP_STATUS)"
-            exit 1
-          fi
+          curl --silent --show-error --fail \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/healthcheck?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
