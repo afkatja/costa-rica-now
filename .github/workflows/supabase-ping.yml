@@ -9,9 +9,12 @@ jobs:
   keepalive:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase
+      - name: Ping Supabase (upsert to healthcheck table)
         run: |
-          curl --silent --show-error --fail \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/healthcheck?select=id&limit=1" \
+          curl --silent --show-error --fail -X POST \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/healthcheck?on_conflict=id" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates" \
+            -d '{"id": 1, "note": "keepalive", "updated_at": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}'
