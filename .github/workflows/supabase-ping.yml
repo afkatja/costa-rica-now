@@ -11,7 +11,14 @@ jobs:
     steps:
       - name: Ping Supabase (upsert to healthcheck table)
         run: |
-          echo "Testing connection..."
+          echo "=== Test GET first ==="
+          curl -v --show-error --fail \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/healthcheck?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            2>&1
+          
+          echo "=== Test POST upsert ==="
           curl -v --show-error --fail -X POST \
             "${{ secrets.SUPABASE_URL }}/rest/v1/healthcheck?on_conflict=id" \
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
